@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AmiMe · Charm Story Matcher</title>
+<style>
+  :root {
+    --ink: #20303f;          /* deep navy ink */
+    --ink-soft: #54657a;
+    --paper: #f6f1e7;        /* warm porcelain */
+    --paper-2: #fffdf8;
+    --line: #e3dac8;
+    --gold: #b08642;
+    --gold-soft: #d8b877;
+    --azure: #2f6fb0;        /* the blue-&-white blue */
+    --shadow: 0 18px 40px -24px rgba(32, 48, 63, .45);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(1200px 600px at 80% -10%, #fbf6ec 0%, rgba(251,246,236,0) 60%),
+      var(--paper);
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 22px 80px; }
+
+  header.hero { text-align: center; padding: 56px 0 30px; }
+  .kicker {
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    text-transform: uppercase; letter-spacing: .32em; font-size: 12px;
+    color: var(--gold); font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(34px, 6vw, 58px); margin: 12px 0 8px; font-weight: 600;
+    letter-spacing: -.01em;
+  }
+  h1 em { font-style: italic; color: var(--azure); }
+  .sub { color: var(--ink-soft); max-width: 620px; margin: 0 auto; font-size: 18px; }
+
+  .panel {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 26px;
+  }
+
+  /* composer */
+  .composer { margin-top: 18px; }
+  label.field-label {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px;
+    letter-spacing: .04em; color: var(--ink-soft); text-transform: uppercase; font-weight: 600;
+  }
+  textarea {
+    width: 100%; margin-top: 10px; min-height: 120px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 12px; background: #fff;
+    padding: 16px 18px; font: inherit; font-size: 18px; color: var(--ink);
+  }
+  textarea:focus { outline: none; border-color: var(--gold-soft); box-shadow: 0 0 0 3px rgba(216,184,119,.25); }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;
+    margin-top: 18px; justify-content: space-between;
+  }
+  .count-box { display: flex; flex-direction: column; gap: 8px; min-width: 240px; }
+  .count-row { display: flex; align-items: center; gap: 14px; }
+  input[type=range] { flex: 1; accent-color: var(--azure); }
+  .count-val {
+    font-size: 26px; font-weight: 600; min-width: 34px; text-align: center; color: var(--azure);
+  }
+  button.cta {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 16px;
+    letter-spacing: .02em; color: #fff; cursor: pointer;
+    background: linear-gradient(180deg, #2f6fb0, #285f99);
+    border: none; border-radius: 999px; padding: 15px 30px;
+    box-shadow: 0 12px 24px -12px rgba(47,111,176,.7);
+    transition: transform .08s ease, box-shadow .2s ease;
+  }
+  button.cta:hover { transform: translateY(-1px); }
+  button.cta:disabled { opacity: .55; cursor: progress; transform: none; }
+
+  .examples { margin-top: 14px; font-size: 14px; color: var(--ink-soft); }
+  .chip {
+    display: inline-block; cursor: pointer; border: 1px dashed var(--gold-soft);
+    color: var(--gold); border-radius: 999px; padding: 5px 12px; margin: 4px 6px 0 0;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; background: #fffaf0;
+  }
+  .chip:hover { background: #fff4dd; }
+
+  .engine-note {
+    margin-top: 14px; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; vertical-align: middle; }
+  .dot.ai { background:#3aa76d; } .dot.local { background: var(--gold); }
+
+  /* results */
+  .results { margin-top: 34px; }
+  .results.hidden { display: none; }
+  .narrative {
+    font-size: 21px; font-style: italic; color: var(--ink);
+    border-left: 3px solid var(--gold-soft); padding: 4px 0 4px 18px; margin: 0 0 24px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+  .card {
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px;
+    overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow);
+  }
+  .card .thumb {
+    position: relative; height: 120px; background: #efe7d6 center/cover no-repeat;
+    border-bottom: 1px solid var(--line);
+  }
+  .card .emoji {
+    position: absolute; right: 12px; bottom: -20px; width: 46px; height: 46px;
+    background: #fff; border-radius: 50%; display: grid; place-items: center;
+    font-size: 24px; box-shadow: 0 6px 14px -6px rgba(0,0,0,.4); border: 1px solid var(--line);
+  }
+  .card .body { padding: 26px 16px 16px; }
+  .card h3 { margin: 0 0 4px; font-size: 19px; }
+  .card .meaning { color: var(--ink-soft); font-size: 14.5px; margin: 0 0 10px; }
+  .card .reason {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; color: var(--ink);
+    background: #f3ede0; border-radius: 10px; padding: 9px 11px;
+  }
+  .card .sheet-tag {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--gold); margin-top: 10px;
+  }
+
+  /* catalogue */
+  .cat-head { display:flex; align-items:baseline; justify-content:space-between; margin: 56px 0 6px; }
+  h2 { font-size: 28px; margin: 0; }
+  .muted { color: var(--ink-soft); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; }
+  details.sheet { margin-top: 16px; border:1px solid var(--line); border-radius: 14px; background: var(--paper-2); overflow:hidden; }
+  details.sheet > summary {
+    list-style: none; cursor: pointer; padding: 16px 20px; display:flex; align-items:center; gap:14px;
+    font-size: 19px; font-weight: 600;
+  }
+  details.sheet > summary::-webkit-details-marker { display:none; }
+  .summary-count { margin-left:auto; color: var(--ink-soft); font-size: 14px; font-weight: 400; }
+  .sheet-inner { padding: 0 20px 20px; }
+  .sheet-photo { width: 100%; border-radius: 10px; border:1px solid var(--line); margin-bottom: 16px; }
+  .mini-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(170px,1fr)); gap: 10px; }
+  .mini {
+    display:flex; gap:10px; align-items:flex-start; padding:10px; border:1px solid var(--line);
+    border-radius:10px; background:#fff;
+  }
+  .mini .me { font-size: 22px; line-height:1; }
+  .mini .mt { font-size: 14px; font-weight:600; }
+  .mini .mm { font-size: 12px; color: var(--ink-soft); font-family: ui-sans-serif, system-ui, sans-serif; }
+
+  footer { text-align:center; margin-top: 60px; color: var(--ink-soft); font-size: 13px;
+    font-family: ui-sans-serif, system-ui, sans-serif; }
+  a { color: var(--azure); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">AmiMe · Charm Atelier</div>
+    <h1>Tell us your <em>story</em>.</h1>
+    <p class="sub">Describe a person, a memory, a moment — and we'll choose the hand-painted
+      charms that string it together into a bracelet.</p>
+  </header>
+
+  <section class="panel composer">
+    <label class="field-label" for="story">Your story</label>
+    <textarea id="story" placeholder="e.g. My mum taught me to bake, we spent every summer by the sea in Italy, and she always says luck follows the kind."></textarea>
+
+    <div class="examples">
+      Try one:
+      <span class="chip">A summer romance by the Amalfi coast</span>
+      <span class="chip">For my mum — strong, calm, and always home</span>
+      <span class="chip">We moved into our first house and got a dog</span>
+      <span class="chip">She left to travel the world with her guitar</span>
+    </div>
+
+    <div class="controls">
+      <div class="count-box">
+        <label class="field-label" for="count">How many charms</label>
+        <div class="count-row">
+          <input type="range" id="count" min="1" max="10" value="5" />
+          <span class="count-val" id="countVal">5</span>
+        </div>
+      </div>
+      <button class="cta" id="go">Find my charms ✦</button>
+    </div>
+
+    <div class="engine-note" id="engineNote"><span class="dot local"></span>Checking for the AI matcher…</div>
+  </section>
+
+  <section class="results hidden" id="results">
+    <p class="narrative" id="narrative"></p>
+    <div class="grid" id="cards"></div>
+  </section>
+
+  <div class="cat-head">
+    <h2>The full charm catalogue</h2>
+    <span class="muted" id="catCount"></span>
+  </div>
+  <div class="muted">Every charm below was identified from your five product sheets. Click a collection to browse.</div>
+  <div id="catalogue"></div>
+
+  <footer>
+    AmiMe story-matcher proof of concept · charms rendered from the uploaded product photography.
+  </footer>
+</div>
+
+<script src="catalog.js"></script>
+<script src="matcher.js"></script>
+<script>
+(function () {
+  "use strict";
+  var CATALOG = window.CHARM_CATALOG;
+  var SHEETS = window.CHARM_SHEETS;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var storyEl = $("story"), countEl = $("count"), countVal = $("countVal");
+  var goEl = $("go"), resultsEl = $("results"), cardsEl = $("cards"), narrativeEl = $("narrative");
+  var engineNote = $("engineNote");
+
+  var backendAvailable = false;
+
+  countEl.addEventListener("input", function () { countVal.textContent = countEl.value; });
+
+  // example chips
+  Array.prototype.forEach.call(document.querySelectorAll(".chip"), function (chip) {
+    chip.addEventListener("click", function () {
+      storyEl.value = chip.textContent.trim();
+      storyEl.focus();
+    });
+  });
+
+  // Probe the optional Claude backend.
+  fetch("/api/health", { method: "GET" }).then(function (r) {
+    return r.ok ? r.json() : null;
+  }).then(function (j) {
+    backendAvailable = !!(j && j.ok && j.claude);
+    setEngineNote();
+  }).catch(function () { backendAvailable = false; setEngineNote(); });
+
+  function setEngineNote(active) {
+    if (active === "ai") {
+      engineNote.innerHTML = '<span class="dot ai"></span>Matched by Claude (claude-opus-4-8) — semantic understanding of your story.';
+    } else if (active === "local") {
+      engineNote.innerHTML = '<span class="dot local"></span>Matched by the on-device keyword engine. Start server.js for Claude-powered matching.';
+    } else if (backendAvailable) {
+      engineNote.innerHTML = '<span class="dot ai"></span>AI matcher ready (Claude). Your story is understood semantically.';
+    } else {
+      engineNote.innerHTML = '<span class="dot local"></span>Running the instant on-device matcher. (Optional: run <code>server.js</code> for Claude-powered matching.)';
+    }
+  }
+
+  goEl.addEventListener("click", run);
+  storyEl.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run();
+  });
+
+  function run() {
+    var story = storyEl.value.trim();
+    var count = parseInt(countEl.value, 10);
+    if (!story) { storyEl.focus(); return; }
+
+    goEl.disabled = true; goEl.textContent = "Choosing…";
+
+    var done = function (data, engine) {
+      render(data);
+      setEngineNote(engine);
+      goEl.disabled = false; goEl.textContent = "Find my charms ✦";
+    };
+
+    if (backendAvailable) {
+      fetch("/api/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ story: story, count: count })
+      }).then(function (r) {
+        if (!r.ok) throw new Error("backend error");
+        return r.json();
+      }).then(function (data) {
+        // hydrate ids returned by Claude into full charm objects
+        done(hydrate(data, story, count), "ai");
+      }).catch(function () {
+        done(window.CharmMatcher.recommend(story, count, CATALOG), "local");
+      });
+    } else {
+      // tiny delay so the UI reads as "thinking"
+      setTimeout(function () {
+        done(window.CharmMatcher.recommend(story, count, CATALOG), "local");
+      }, 180);
+    }
+  }
+
+  // Convert {summary, charms:[{id, reason}]} from the backend into full objects.
+  function hydrate(data, story, count) {
+    if (!data || !Array.isArray(data.charms)) {
+      return window.CharmMatcher.recommend(story, count, CATALOG);
+    }
+    var byId = {};
+    CATALOG.forEach(function (c) { byId[c.id] = c; });
+    var charms = data.charms.map(function (sel) {
+      var base = byId[sel.id];
+      if (!base) return null;
+      var out = {}; for (var k in base) out[k] = base[k];
+      out.reason = sel.reason || base.meaning;
+      return out;
+    }).filter(Boolean);
+    if (!charms.length) return window.CharmMatcher.recommend(story, count, CATALOG);
+    return { summary: data.summary || "", charms: charms, engine: "ai" };
+  }
+
+  function render(data) {
+    narrativeEl.textContent = data.summary || "";
+    cardsEl.innerHTML = "";
+    data.charms.forEach(function (c) {
+      cardsEl.appendChild(charmCard(c));
+    });
+    resultsEl.classList.remove("hidden");
+    resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function charmCard(c) {
+    var sheet = SHEETS[c.sheet] || {};
+    var el = document.createElement("div");
+    el.className = "card";
+    el.innerHTML =
+      '<div class="thumb" style="background-image:url(\'' + sheet.file + '\')">' +
+        '<div class="emoji">' + c.emoji + '</div>' +
+      '</div>' +
+      '<div class="body">' +
+        '<h3>' + esc(c.name) + '</h3>' +
+        '<p class="meaning">' + esc(cap(c.meaning)) + '</p>' +
+        '<div class="reason">' + esc(c.reason || "") + '</div>' +
+        '<div class="sheet-tag">' + esc(sheet.name || "") + '</div>' +
+      '</div>';
+    return el;
+  }
+
+  // ---- catalogue browser ----
+  function buildCatalogue() {
+    $("catCount").textContent = CATALOG.length + " charms · 5 collections";
+    var host = $("catalogue");
+    Object.keys(SHEETS).forEach(function (sid) {
+      var sheet = SHEETS[sid];
+      var items = CATALOG.filter(function (c) { return String(c.sheet) === String(sid); });
+      var det = document.createElement("details");
+      det.className = "sheet";
+      var mini = items.map(function (c) {
+        return '<div class="mini"><div class="me">' + c.emoji + '</div><div>' +
+          '<div class="mt">' + esc(c.name) + '</div>' +
+          '<div class="mm">' + esc(cap(c.meaning)) + '</div></div></div>';
+      }).join("");
+      det.innerHTML =
+        '<summary>' + esc(sheet.name) +
+          '<span class="summary-count">' + items.length + ' charms</span></summary>' +
+        '<div class="sheet-inner">' +
+          '<img class="sheet-photo" src="' + sheet.file + '" alt="' + esc(sheet.name) + '" loading="lazy">' +
+          '<div class="mini-grid">' + mini + '</div>' +
+        '</div>';
+      host.appendChild(det);
+    });
+  }
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]; }); }
+  function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  buildCatalogue();
+})();
+</script>
+</body>
+</html>

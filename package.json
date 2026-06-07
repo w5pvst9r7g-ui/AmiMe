@@ -1,0 +1,17 @@
+{
+  "name": "amime-charm-story-matcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-enabled charm story matcher POC — enter a sentence, get the charms that tell that story.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check catalog.js && node --check matcher.js && node test/smoke.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.69.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}
