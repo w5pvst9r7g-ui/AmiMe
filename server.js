@@ -338,7 +338,15 @@ function serveStatic(req, res) {
 
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/health") {
-    return sendJson(res, 200, { ok: true, claude: hasKey, model: MODEL, gemini: hasGemini, geminiModel: GEMINI_MODEL });
+    // commit/branch are injected by Render at build time, so you can confirm
+    // which revision is actually deployed (compare against main on GitHub).
+    return sendJson(res, 200, {
+      ok: true,
+      claude: hasKey, model: MODEL,
+      gemini: hasGemini, geminiModel: GEMINI_MODEL,
+      commit: process.env.RENDER_GIT_COMMIT || null,
+      branch: process.env.RENDER_GIT_BRANCH || null
+    });
   }
 
   if (req.method === "POST" && req.url === "/api/recommend") {
