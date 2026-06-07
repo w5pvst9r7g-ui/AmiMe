@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>AmiMe · The Charm Atelier</title>
 <meta name="description" content="AmiMe — a prestige charm bracelet atelier. Tell us your story and we compose a hand-finished bracelet of meaningful charms, made to be worn for life." />
+<meta name="theme-color" content="#faf7f2" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="AmiMe · The Charm Atelier" />
+<meta property="og:description" content="Tell us your story and we compose a hand-finished bracelet of meaningful charms — made to be worn for life." />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231b1a18'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='%23d9bd86' font-family='Georgia,serif'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -75,6 +81,17 @@
     background: var(--ink); color: #fff; border: none;
   }
   .btn-dark:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+
+  /* ---------- announcement bar ---------- */
+  .announce {
+    background: var(--ink); color: #e8dfce; text-align: center;
+    font-family: var(--sans); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase;
+    padding: 9px 16px;
+  }
+
+  /* accessibility: visible keyboard focus */
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 4px; }
+  .btn:focus-visible, .chip:focus-visible { outline-offset: 3px; }
 
   /* ---------- header ---------- */
   .site-header {
@@ -444,6 +461,8 @@
 </style>
 </head>
 <body>
+
+  <div class="announce">Complimentary shipping &amp; gift wrapping · Each piece hand-finished to order · Styled by AI, made by hand</div>
 
   <header class="site-header" id="siteHeader">
     <div class="wrap nav-inner">
