@@ -55,31 +55,52 @@ const CHARM_BY_ID = new Map(CHARMS.map((c) => [c.id, c]));
 const BRACELET_BY_ID = new Map(BRACELETS.map((b) => [b.id, b]));
 
 // Built per request so we can pin the EXACT number of charms (the model
-// otherwise invents extra ones) and demand even spacing (it otherwise clusters
-// them). `names` is the ordered list of the picked charms.
+// otherwise invents extra ones), demand even spacing (it otherwise clusters
+// them) and force a single, anatomically-correct bracelet (it otherwise
+// produces multi-strand / draped / coiled chains). `names` is the ordered list
+// of the picked charms.
 function buildMockupPrompt(names) {
   const n = names.length;
   const list = names.map((nm, i) => "  " + (i + 2) + ". " + nm).join("\n");
+  const charmWord = n === 1 ? "charm" : "charms";
   return (
-    "A warm, natural lifestyle product photo of a woman's hand and wrist wearing " +
-    "ONE delicate gold charm bracelet.\n\n" +
+    "Professional lifestyle product photograph of a SINGLE delicate gold charm " +
+    "bracelet worn on a woman's wrist.\n\n" +
+
+    "COMPOSITION (very important):\n" +
+    "- A relaxed, elegant hand and forearm, anatomically correct: one hand, five " +
+    "fingers, natural proportions and pose.\n" +
+    "- The bracelet sits snugly AROUND THE WRIST (just below the wrist bone) and " +
+    "forms ONE single clean loop that encircles the wrist exactly once, following " +
+    "the curve of the wrist.\n" +
+    "- The charms hang DOWNWARD from the lower front of the chain under gravity, " +
+    "dangling just below the wrist and facing the camera — not sticking out or floating.\n\n" +
+
     "Reference images, in order:\n" +
-    "  1. the bracelet base (the chain/clasp to use)\n" +
+    "  1. the bracelet base (the chain + clasp style to reproduce)\n" +
     list + "\n\n" +
-    "These " + n + " charms are the ONLY charms on the bracelet:\n" +
-    "- Show EXACTLY " + n + " charm" + (n === 1 ? "" : "s") + " — the ones provided as references — and NO others. " +
-    "Do not invent, add, duplicate, swap or omit any charm. Exactly " + n + " charm" + (n === 1 ? "" : "s") + ", no more, no fewer.\n" +
+
+    "STRICT RULES:\n" +
+    "- Use EXACTLY " + n + " " + charmWord + " — the ones provided as references — and NO others. " +
+    "Do not invent, add, duplicate, swap or omit any charm. Exactly " + n + " " + charmWord + ", no more, no fewer.\n" +
     "- Keep each charm faithful to its reference in shape, colour and painted detail.\n" +
-    "- Hang the charms in a single row along the front of the bracelet, EVENLY SPACED " +
-    "with clear, equal gaps between them. Each charm must be fully visible and separated — " +
-    "they must NOT bunch up, overlap, touch or cluster together.\n" +
-    "- The bracelet is a SINGLE band that encircles the wrist exactly once, sitting " +
-    "naturally flat against the skin. It must look like one normal bracelet — do NOT " +
-    "wrap it around the wrist multiple times, and do NOT add extra strands, loops, " +
-    "layers or chains beyond the single bracelet shown in the reference.\n" +
-    "- Exactly one bracelet, worn on the wrist; no extra jewellery.\n\n" +
-    "Style: soft natural daylight, shallow depth of field, tasteful neutral background " +
-    "(cafe table or outdoors), premium editorial product photography. Square crop, photorealistic."
+    "- Arrange the charms in a single row along the front of the bracelet, EVENLY SPACED " +
+    "with clear, equal gaps. Each charm must be fully visible and separated — they must " +
+    "NOT bunch up, overlap, touch or cluster together.\n" +
+    "- ONE bracelet only: a single thin gold chain forming ONE loop around the wrist. " +
+    "Do NOT create multiple strands, multiple chains, stacked or layered bracelets, " +
+    "wrapped/coiled chain, or a thick cuff. Beyond this one bracelet, add no other " +
+    "jewellery, rings or watch.\n" +
+    "- The chain must read as a real thin bracelet sitting around the wrist — never " +
+    "draped across the back of the hand, never floating, knotted or tangled.\n\n" +
+
+    "STYLE: soft natural daylight, shallow depth of field, tasteful neutral background " +
+    "(cafe table or outdoors), premium editorial product photography, photorealistic, " +
+    "sharp focus on the bracelet. Square crop.\n\n" +
+
+    "AVOID: extra or duplicate charms; more or fewer than " + n + " " + charmWord + "; multiple " +
+    "bracelets; multiple or doubled chain strands; coiled or wrapped chain; chain draped " +
+    "over the hand; deformed hands; extra fingers; other jewellery; any text or watermark."
   );
 }
 
