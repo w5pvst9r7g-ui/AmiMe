@@ -1,0 +1,32 @@
+# Render Blueprint — one-click deploy of the AmiMe charm matcher *with* the
+# Node backend, so the Gemini "see it on a wrist" mock-up and the Claude
+# matcher both work live.
+#
+# How to use (no command line needed):
+#   1. Push this repo to GitHub (already done).
+#   2. Go to https://dashboard.render.com → New → Blueprint.
+#   3. Connect this repository and pick the `main` branch.
+#   4. When prompted, paste your GEMINI_API_KEY (and optionally
+#      ANTHROPIC_API_KEY). Click Apply.
+# Render builds, runs `npm start`, and gives you a public https URL.
+services:
+  - type: web
+    name: amime-charm-matcher
+    runtime: node
+    plan: free            # free tier is fine for a demo (sleeps when idle)
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Secrets — Render prompts you to paste these in the dashboard; they are
+      # never stored in the repo. GEMINI_API_KEY powers the wrist mock-up.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional — enables Claude-powered semantic charm matching.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Pin the Gemini image model (override here if you switch models).
+      - key: GEMINI_IMAGE_MODEL
+        value: gemini-2.5-flash-image-preview
