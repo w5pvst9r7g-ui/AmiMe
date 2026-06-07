@@ -96,8 +96,33 @@
     gift: ["bow", "ribbon", "present"],
     faith: ["church", "spiritual", "ceremony"],
     new: ["new beginning", "fresh", "nest", "beginning", "chapter"],
-    sweet: ["strawberry", "cherry", "sugar", "candy", "honey", "sweetness"],
-    "long distance": ["letter", "envelope", "forget me not", "moon"]
+    sweet: ["strawberry", "cherry", "sugar", "candy", "honey", "sweetness", "donut", "treat"],
+    "long distance": ["letter", "envelope", "forget me not", "moon"],
+    // ---- newer collections: comfort, cuteness, retro, snacks, pets ----
+    cosy: ["teacup", "tea", "comfort", "warm", "blanket", "home", "snug"],
+    cozy: ["teacup", "tea", "comfort", "warm", "blanket", "home", "snug"],
+    comfort: ["teacup", "cosy", "warm", "hug", "soft", "home", "tea"],
+    cute: ["teacup", "panda", "fox", "bunny", "bear", "hedgehog", "sweet", "adorable"],
+    tea: ["teacup", "cosy", "comfort", "cup", "warm"],
+    coffee: ["latte", "cup", "cosy", "morning", "warm"],
+    pet: ["cat", "dog", "kitty", "puppy", "animal", "companion"],
+    dog: ["puppy", "shiba", "loyal", "pet", "companion", "fox"],
+    cat: ["kitty", "feline", "pet", "companion"],
+    childhood: ["notebook", "game", "toy", "nostalgia", "retro", "school", "ty"],
+    nostalgia: ["retro", "childhood", "vintage", "disc", "game", "notebook"],
+    retro: ["vintage", "nostalgia", "disc", "game", "label", "90s"],
+    "90s": ["game", "disc", "ty", "retro", "nostalgia"],
+    gaming: ["game", "handheld", "play", "retro"],
+    snack: ["chips", "donut", "treat", "food", "sweet"],
+    snacks: ["chips", "donut", "treat", "food", "sweet"],
+    breakfast: ["pastry", "coffee", "latte", "morning"],
+    autumn: ["pumpkin", "pear", "leaf", "harvest", "cosy"],
+    fall: ["pumpkin", "pear", "harvest", "cosy", "autumn"],
+    protection: ["eye", "evil eye", "amulet", "guard", "ward", "luck"],
+    valentine: ["heart", "love", "sweetheart", "cupid", "romance", "tooth", "cherry"],
+    crush: ["heart", "love", "monster", "cute", "sweetheart"],
+    sky: ["cloud", "sun", "star", "moon", "blue"],
+    nature: ["tree", "mountain", "garden", "flower", "outdoors", "snake"]
   };
 
   // Words too generic to be useful as match tokens.
@@ -216,20 +241,115 @@
       defaults.forEach(function (c) { picked.push({ charm: c, score: 0, hits: [] }); });
     }
 
-    var result = picked.slice(0, count).map(function (s) {
+    function hydrateScored(s) {
       var out = {};
       for (var k in s.charm) out[k] = s.charm[k];
       out.reason = reasonFor(s.charm, s.hits);
       out.score = Math.round(s.score * 100) / 100;
       out.matched = s.hits;
       return out;
-    });
+    }
+
+    var result = picked.slice(0, count).map(hydrateScored);
+
+    // A ranked pool of every other charm (best first) powers the "show
+    // alternatives" menu and the per-charm swap button. Charms that scored 0
+    // keep their catalogue order so the pool never runs dry.
+    var pickedIds = {};
+    result.forEach(function (c) { pickedIds[c.id] = true; });
+    var pool = scored.filter(function (s) { return !pickedIds[s.charm.id]; })
+                     .map(hydrateScored);
 
     return {
       summary: buildSummary(story, result),
       charms: result,
+      alternatives: pool.slice(0, 8),
+      pool: pool,
+      bracelet: recommendBracelet(story, result, null, concepts),
       engine: "local"
     };
+  }
+
+  // The mood each charm category lends to a bracelet choice. These words are
+  // matched against each bracelet's style + vibe, so a story full of love
+  // charms drifts toward romantic chains, a cosy/cute one toward playful ones.
+  var CATEGORY_MOOD = {
+    love: ["romantic", "heart", "classic", "pearl", "love"],
+    family: ["classic", "heart", "meaningful", "pearl", "heirloom"],
+    mama: ["classic", "meaningful", "pearl", "heart", "heirloom"],
+    animal: ["playful", "cute", "whimsical", "spring", "charm"],
+    food: ["playful", "fun", "cute", "charm"],
+    childhood: ["playful", "fun", "whimsical", "retro", "charm"],
+    sea: ["delicate", "spring", "elegant", "dainty", "coastal"],
+    nature: ["spring", "delicate", "earthy", "cheerful", "boho"],
+    flora: ["spring", "floral", "cheerful", "delicate", "feminine"],
+    fruit: ["cheerful", "playful", "spring", "fun"],
+    celestial: ["celestial", "elegant", "star", "delicate", "dreamy"],
+    folk: ["boho", "earthy", "bold", "playful", "statement"],
+    object: ["modern", "cool", "quirky", "trendy"],
+    music: ["cool", "modern", "retro", "edgy"],
+    luck: ["playful", "charm", "cheerful", "spring"],
+    home: ["classic", "earthy", "timeless"],
+    word: ["modern", "classic", "minimal"]
+  };
+
+  /**
+   * recommendBracelet(story, charms, bracelets) ->
+   *   { bracelet, reason, alternatives:[...] }
+   * Scores each bracelet on (a) story "vibe" word matches, (b) the mood of the
+   * chosen charms' categories, and (c) how well it fits the charm count.
+   * `charms` may be the picked-charm array or just a count.
+   */
+  function recommendBracelet(story, charms, bracelets, concepts) {
+    bracelets = bracelets || root.CHARM_BRACELETS || [];
+    if (!bracelets.length) return null;
+    concepts = concepts || expand(story);
+
+    var charmCount, mood = {};
+    if (typeof charms === "number") {
+      charmCount = charms;
+    } else {
+      charms = charms || [];
+      charmCount = charms.length || 3;
+      charms.forEach(function (c) {
+        (CATEGORY_MOOD[c.category] || []).forEach(function (w) {
+          mood[w] = (mood[w] || 0) + 1;
+        });
+      });
+    }
+
+    var scored = bracelets.map(function (b) {
+      var s = 0, hits = [];
+      var words = (b.vibe || []).concat([b.style]);
+      words.forEach(function (t) {
+        var lt = String(t).toLowerCase();
+        if (concepts[lt]) { s += concepts[lt] * 1.6; hits.push(t); }   // story words
+        if (mood[lt]) { s += mood[lt] * 0.7; if (hits.indexOf(t) < 0) hits.push(t); }
+      });
+      var fit = b.fit || [1, 8];
+      if (charmCount >= fit[0] && charmCount <= fit[1]) {
+        s += 1.2;
+      } else {
+        var miss = charmCount < fit[0] ? fit[0] - charmCount : charmCount - fit[1];
+        s -= Math.min(2, miss) * 0.4;
+      }
+      return { b: b, s: s, hits: hits };
+    }).sort(function (a, b) { return b.s - a.s; });
+
+    var top = scored[0];
+    return {
+      bracelet: top.b,
+      reason: braceletReason(top.b, top.hits, charmCount),
+      score: Math.round(top.s * 100) / 100,
+      alternatives: scored.slice(1, 4).map(function (x) { return x.b; })
+    };
+  }
+
+  function braceletReason(b, hits, n) {
+    var why = hits.length
+      ? "it leans " + hits.slice(0, 2).join(" & ")
+      : "it comfortably carries a " + n + "-charm story";
+    return b.blurb + " We'd pair it because " + why + ".";
   }
 
   function hasOtherCategories(scored, fromIndex, usedCats) {
@@ -266,7 +386,8 @@
       " — each charm carries a thread of what you described.";
   }
 
-  var API = { recommend: recommend, expand: expand, SYNONYMS: SYNONYMS };
+  var API = { recommend: recommend, recommendBracelet: recommendBracelet,
+              expand: expand, SYNONYMS: SYNONYMS };
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = API;

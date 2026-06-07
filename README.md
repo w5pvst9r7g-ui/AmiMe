@@ -4,9 +4,17 @@ Enter a sentence about a person, a memory or a moment, choose how many charms yo
 want, and AmiMe picks the hand-painted charms that, strung together, **tell that
 story** — each with a short reason for why it belongs.
 
-This is a proof of concept built from five product photo sheets. It identifies
-**every charm** into a structured catalogue, then matches a customer's story
-against it.
+This is a proof of concept built from nine product photo sheets. It identifies
+**every charm** (167 of them) into a structured catalogue, then matches a
+customer's story against it — and recommends a **bracelet** to hang them on.
+
+Each result also lets you:
+- **Swap** any charm for the next-best alternative with one tap,
+- open a **"more charms that fit"** menu and drop one in for your weakest match,
+- **cycle the recommended bracelet** through other styles that suit the story.
+
+Charm cut-outs are produced with an AI matte (`rembg`) so every charm is a
+clean, transparent, website-ready image — no photographic background.
 
 ```
 ┌──────────────┐     ┌─────────────────────────────┐     ┌────────────────────┐
@@ -22,9 +30,9 @@ Easiest first.
 
 **A) One file, works on your phone (no server, no internet)** ← simplest for iOS
 `amime-charm-matcher.html` is the **entire app in a single self-contained file**
-(catalogue, matcher, and all 95 charm images embedded). To test on an iPhone:
-AirDrop / email / save it to iCloud Drive, then open it in **Files → tap → it
-opens in Safari**. Or just double-click it on any computer. ~2.9 MB, fully
+(catalogue, matcher, and all charm + bracelet images embedded). To test on an
+iPhone: AirDrop / email / save it to iCloud Drive, then open it in **Files → tap
+→ it opens in Safari**. Or just double-click it on any computer. ~10 MB, fully
 offline. Rebuild it after changes with `python3 tools/build_standalone.py`.
 
 **B) Shareable URL (GitHub Pages)**
@@ -57,15 +65,16 @@ little dot under the composer tells you which engine answered.
 
 | File | Purpose |
 |---|---|
-| `catalog.js` | **The charm catalogue** — every charm from the 5 sheets, with name, meaning, source photo + position, and matching tags. Works in the browser and Node. |
-| `matcher.js` | Zero-dependency, offline matcher. Tokenises the story, expands it with a synonym map, scores every charm, diversifies, returns the best `N` with reasons. |
-| `index.html` | Self-contained front-end: story composer, charm-count slider, results, and a browsable catalogue showing the original product sheets. |
-| `server.js` | Optional Node backend. Serves the page and a `POST /api/recommend` endpoint that asks **Claude (`claude-opus-4-8`)** to pick charms with structured-output JSON. |
+| `catalog.js` | **The catalogue** — 167 charms across 9 sheets + 16 bracelets, each with name, meaning, source + position, and matching tags/vibe. Works in the browser and Node. |
+| `matcher.js` | Zero-dependency, offline matcher. Scores every charm, diversifies, returns the best `N` with reasons, **plus** a swap pool, alternatives, and a bracelet recommendation. |
+| `index.html` | Self-contained front-end: story composer, results with per-charm **swap**, an **alternatives** menu, a **recommended bracelet** (cyclable), and a browsable catalogue. |
+| `server.js` | Optional Node backend. `POST /api/recommend` asks **Claude (`claude-opus-4-8`)** to pick charms with structured-output JSON. |
 | `amime-charm-matcher.html` | **The whole app as one self-contained file** (built artifact) — best for offline / iOS testing. |
-| `charms/` | The five source product photos + `charms/crops/` (one cropped image per charm). |
-| `tools/crop_charms.py` | Auto-crops each charm from the sheets and matches it to its catalogue id by position. |
+| `charms/` | The nine source product photos + bracelet sheet + `charms/crops/` (one transparent cut-out per charm and bracelet). |
+| `tools/ai_crop.py` | **AI cut-out pipeline** — `rembg` matte → connected components → clean, centred, transparent WebP per charm (Voronoi-splits touching charms, ignores decorations). |
+| `tools/build_catalog.py` | Generates the new sheet/charm/bracelet entries into `catalog.js`. |
 | `tools/build_standalone.py` | Bundles everything into `amime-charm-matcher.html`. |
-| `test/smoke.test.js` | Catalogue integrity, crop coverage, and matcher relevance checks (`npm run check`). |
+| `test/smoke.test.js` | Catalogue + bracelet integrity, crop coverage, matcher relevance, and recommendation-extras checks (`npm run check`). |
 
 ## The catalogue
 
@@ -76,6 +85,13 @@ Charms are grouped by the photo (“collection”) they came from:
 3. **Mama & Family** — "Mama", "Super Mama", nest, lavender, "Our Sunshine"…
 4. **Hand-Painted Folk** — crab, snail, butterfly, dragonfly, strawberries, tulips…
 5. **Terracotta & Treasures** — guitar, camera, cactus, mountains, bell, magic 8-ball…
+6. **Vintage Everyday Miniatures** — apple, sardine tins, tulips, mushroom, little houses…
+7. **Retro Childhood Whimsy** — handheld game, MASH notebook, gingerbread man, evil-eye heart…
+8. **Teacup Cozy Critters** — bear, fox, panda, hedgehog & friends nestled in teacups…
+9. **Sweetheart Gallery** — hearts, love monster, penguin, ladybug, sweet-treat charms…
+
+Plus **16 bracelets** (dainty chains, cuban links, pearls, charm stations…) the
+matcher pairs to the story and charm count.
 
 Each entry carries an `id` (use it as your Shopify product handle / SKU key), a
 plain-language `meaning`, and broad `tags` that mix the literal subject with the

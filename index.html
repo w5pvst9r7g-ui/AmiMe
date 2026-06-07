@@ -134,6 +134,57 @@
     font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing: .04em;
     text-transform: uppercase; color: var(--gold); margin-top: 10px;
   }
+  .card .body { display:flex; flex-direction:column; }
+  .card .swap {
+    margin-top: 12px; align-self: flex-start; cursor: pointer;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; font-weight: 600;
+    color: var(--ink); background: #fff; border: 1px solid var(--line);
+    border-radius: 999px; padding: 6px 13px; transition: background .15s, border-color .15s;
+  }
+  .card .swap:hover { background: var(--gold-soft); border-color: var(--gold); }
+  .card .swap:disabled { opacity:.4; cursor: default; }
+
+  /* recommended bracelet */
+  .bracelet-card {
+    display:flex; gap: 20px; align-items:center; margin: 0 0 26px;
+    background: linear-gradient(135deg, #fbf6ea, #f3ead4); border:1px solid var(--gold-soft);
+    border-radius: 18px; padding: 18px 22px; box-shadow: var(--shadow);
+  }
+  .bracelet-card .br-thumb {
+    flex: 0 0 130px; height: 130px; border-radius: 14px; background: #fff;
+    border: 1px solid var(--line); display:grid; place-items:center;
+  }
+  .bracelet-card .br-thumb img { max-width: 90%; max-height: 90%; filter: drop-shadow(0 6px 10px rgba(0,0,0,.18)); }
+  .bracelet-card .br-kicker {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing:.08em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 4px;
+  }
+  .bracelet-card h3 { margin: 0 0 6px; font-size: 23px; }
+  .bracelet-card p { margin: 0 0 12px; color: var(--ink-soft); font-size: 14.5px; }
+  .br-swap {
+    cursor:pointer; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; font-weight:600;
+    color: var(--ink); background:#fff; border:1px solid var(--line); border-radius:999px; padding:7px 14px;
+  }
+  .br-swap:hover { background: var(--gold-soft); border-color: var(--gold); }
+
+  /* alternatives menu */
+  details.alts { margin-top: 24px; border:1px solid var(--line); border-radius: 14px; background: var(--paper-2); overflow:hidden; }
+  details.alts > summary {
+    list-style:none; cursor:pointer; padding: 14px 18px; font-weight:600; font-size: 16px;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  details.alts > summary::-webkit-details-marker { display:none; }
+  .alt-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 10px; padding: 4px 18px 8px; }
+  .alt {
+    cursor:pointer; text-align:center; background:#fff; border:1px solid var(--line);
+    border-radius:12px; padding:10px 6px; display:flex; flex-direction:column; align-items:center; gap:6px;
+    transition: border-color .15s, transform .1s;
+  }
+  .alt:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .alt .alt-img { width: 64px; height: 64px; display:grid; place-items:center; }
+  .alt .alt-img img { max-width: 64px; max-height: 64px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.15)); }
+  .alt .alt-name { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; line-height: 1.25; color: var(--ink); }
+  .alt-hint { padding: 2px 18px 16px; color: var(--ink-soft); font-size: 12.5px; font-family: ui-sans-serif, system-ui, sans-serif; }
 
   /* catalogue */
   .cat-head { display:flex; align-items:baseline; justify-content:space-between; margin: 56px 0 6px; }
@@ -201,14 +252,16 @@
 
   <section class="results hidden" id="results">
     <p class="narrative" id="narrative"></p>
+    <div id="bracelet"></div>
     <div class="grid" id="cards"></div>
+    <div id="altWrap"></div>
   </section>
 
   <div class="cat-head">
     <h2>The full charm catalogue</h2>
     <span class="muted" id="catCount"></span>
   </div>
-  <div class="muted">Every charm below was identified from your five product sheets. Click a collection to browse.</div>
+  <div class="muted">Every charm and bracelet below was identified from your product photography. Click a collection to browse.</div>
   <div id="catalogue"></div>
 
   <footer>
@@ -227,7 +280,14 @@
   var $ = function (id) { return document.getElementById(id); };
   var storyEl = $("story"), countEl = $("count"), countVal = $("countVal");
   var goEl = $("go"), resultsEl = $("results"), cardsEl = $("cards"), narrativeEl = $("narrative");
+  var braceletEl = $("bracelet"), altWrap = $("altWrap");
   var engineNote = $("engineNote");
+  var BRACELETS = window.CHARM_BRACELETS || [];
+
+  // Live selection state so swapping a charm / cycling the bracelet / picking
+  // an alternative all update in place.
+  var state = { displayed: [], pool: [], story: "", count: 5,
+                bracelet: null, brOptions: [], brIdx: 0, altsOpen: false };
 
   var backendAvailable = false;
 
@@ -282,7 +342,7 @@
     goEl.disabled = true; goEl.textContent = "Choosing…";
 
     var done = function (data, engine) {
-      render(data);
+      render(data, story, count);
       setEngineNote(engine);
       goEl.disabled = false; goEl.textContent = "Find my charms ✦";
     };
@@ -327,12 +387,27 @@
     return { summary: data.summary || "", charms: charms, engine: "ai" };
   }
 
-  function render(data) {
+  function render(data, story, count) {
+    state.story = story;
+    state.displayed = (data.charms || []).slice();
+    state.count = count || state.displayed.length || 5;
+
+    // Build a ranked pool of every other charm for swapping / alternatives.
+    var shown = {};
+    state.displayed.forEach(function (c) { shown[c.id] = true; });
+    var pool = data.pool && data.pool.length ? data.pool.slice() : null;
+    if (!pool) {
+      // AI path returns only the picks; derive a pool from the local matcher.
+      var local = window.CharmMatcher.recommend(story, CATALOG.length, CATALOG);
+      pool = local.pool || [];
+    }
+    state.pool = pool.filter(function (c) { return !shown[c.id]; });
+
     narrativeEl.textContent = data.summary || "";
-    cardsEl.innerHTML = "";
-    data.charms.forEach(function (c) {
-      cardsEl.appendChild(charmCard(c));
-    });
+    setBracelet(data.bracelet ||
+      window.CharmMatcher.recommendBracelet(story, state.displayed, BRACELETS));
+    renderCards();
+    renderAlternatives();
     resultsEl.classList.remove("hidden");
     resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -342,7 +417,12 @@
     return "charms/crops/" + c.id + ".webp";
   }
 
-  function charmCard(c) {
+  function renderCards() {
+    cardsEl.innerHTML = "";
+    state.displayed.forEach(function (c, i) { cardsEl.appendChild(charmCard(c, i)); });
+  }
+
+  function charmCard(c, idx) {
     var sheet = SHEETS[c.sheet] || {};
     var el = document.createElement("div");
     el.className = "card";
@@ -356,13 +436,105 @@
         '<p class="meaning">' + esc(cap(c.meaning)) + '</p>' +
         '<div class="reason">' + esc(c.reason || "") + '</div>' +
         '<div class="sheet-tag">' + esc(sheet.name || "") + '</div>' +
+        '<button class="swap" type="button"' + (state.pool.length ? "" : " disabled") + '>⇄ Swap</button>' +
       '</div>';
+    var btn = el.querySelector(".swap");
+    if (btn) btn.addEventListener("click", function () { swapAt(idx); });
     return el;
+  }
+
+  // Replace the charm at idx with the best available alternative.
+  function swapAt(idx) {
+    if (!state.pool.length) return;
+    var incoming = state.pool.shift();
+    var outgoing = state.displayed[idx];
+    state.displayed[idx] = incoming;
+    state.pool.push(outgoing);     // recycle to the back of the queue
+    afterChange();
+  }
+
+  // Swap a specific alternative in for the current weakest match.
+  function chooseAlternative(id) {
+    var pi = -1;
+    for (var i = 0; i < state.pool.length; i++) { if (state.pool[i].id === id) { pi = i; break; } }
+    if (pi < 0) return;
+    var incoming = state.pool.splice(pi, 1)[0];
+    var weakest = 0;
+    for (var j = 1; j < state.displayed.length; j++) {
+      if ((state.displayed[j].score || 0) < (state.displayed[weakest].score || 0)) weakest = j;
+    }
+    var outgoing = state.displayed[weakest];
+    state.displayed[weakest] = incoming;
+    state.pool.push(outgoing);
+    afterChange();
+  }
+
+  function afterChange() {
+    // The bracelet leans on the mix of charms, so re-suggest it on every change.
+    setBracelet(window.CharmMatcher.recommendBracelet(state.story, state.displayed, BRACELETS));
+    renderCards();
+    renderAlternatives();
+  }
+
+  // ---- recommended bracelet ----
+  function setBracelet(rec) {
+    state.bracelet = rec;
+    if (rec && rec.bracelet) {
+      state.brOptions = [rec.bracelet].concat(rec.alternatives || []);
+      state.brIdx = 0;
+    } else {
+      state.brOptions = []; state.brIdx = 0;
+    }
+    renderBracelet();
+  }
+
+  function renderBracelet() {
+    if (!state.brOptions.length) { braceletEl.innerHTML = ""; return; }
+    var br = state.brOptions[state.brIdx];
+    var reason = state.brIdx === 0 && state.bracelet ? state.bracelet.reason : br.blurb;
+    braceletEl.innerHTML =
+      '<div class="bracelet-card">' +
+        '<div class="br-thumb"><img src="' + cropPath(br) + '" alt="' + esc(br.name) + '" onerror="this.style.display=\'none\'"></div>' +
+        '<div class="br-body">' +
+          '<div class="br-kicker">Recommended bracelet</div>' +
+          '<h3>' + esc(br.name) + '</h3>' +
+          '<p>' + esc(reason || "") + '</p>' +
+          (state.brOptions.length > 1 ? '<button class="br-swap" type="button">Show another bracelet ⟳</button>' : '') +
+        '</div>' +
+      '</div>';
+    var bs = braceletEl.querySelector(".br-swap");
+    if (bs) bs.addEventListener("click", function () {
+      state.brIdx = (state.brIdx + 1) % state.brOptions.length;
+      renderBracelet();
+    });
+  }
+
+  // ---- alternatives menu ----
+  function renderAlternatives() {
+    var alts = state.pool.slice(0, 12);
+    if (!alts.length) { altWrap.innerHTML = ""; return; }
+    var html = '<details class="alts"' + (state.altsOpen ? " open" : "") + '>' +
+      '<summary>Show ' + state.pool.length + ' more charms that fit your story ▾</summary>' +
+      '<div class="alt-grid">';
+    alts.forEach(function (c) {
+      html += '<button class="alt" type="button" data-id="' + esc(c.id) + '">' +
+        '<span class="alt-img"><img src="' + cropPath(c) + '" alt="" onerror="this.style.display=\'none\'"></span>' +
+        '<span class="alt-name">' + esc(c.name) + '</span></button>';
+    });
+    html += '</div><div class="alt-hint">Tap one to swap it in for your weakest match.</div></details>';
+    altWrap.innerHTML = html;
+    var det = altWrap.querySelector("details");
+    det.addEventListener("toggle", function () { state.altsOpen = det.open; });
+    Array.prototype.forEach.call(altWrap.querySelectorAll(".alt"), function (btn) {
+      btn.addEventListener("click", function () { chooseAlternative(btn.getAttribute("data-id")); });
+    });
   }
 
   // ---- catalogue browser ----
   function buildCatalogue() {
-    $("catCount").textContent = CATALOG.length + " charms · 5 collections";
+    var nCollections = Object.keys(SHEETS).length;
+    $("catCount").textContent = CATALOG.length + " charms · " + BRACELETS.length +
+      " bracelets · " + nCollections + " collections";
     var host = $("catalogue");
     Object.keys(SHEETS).forEach(function (sid) {
       var sheet = SHEETS[sid];
@@ -385,6 +557,23 @@
         '</div>';
       host.appendChild(det);
     });
+
+    // Bracelets collection
+    if (BRACELETS.length) {
+      var bd = document.createElement("details");
+      bd.className = "sheet";
+      var bmini = BRACELETS.map(function (b) {
+        return '<div class="mini"><div class="me">' +
+          '<img src="' + cropPath(b) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'"></div><div>' +
+          '<div class="mt">' + esc(b.name) + '</div>' +
+          '<div class="mm">' + esc(b.blurb) + '</div></div></div>';
+      }).join("");
+      bd.innerHTML =
+        '<summary>The Bracelets' +
+          '<span class="summary-count">' + BRACELETS.length + ' styles</span></summary>' +
+        '<div class="sheet-inner"><div class="mini-grid">' + bmini + '</div></div>';
+      host.appendChild(bd);
+    }
   }
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {

@@ -6,8 +6,10 @@
 "use strict";
 
 const assert = require("assert");
-const { CHARMS, SHEETS } = require("../catalog.js");
+const { CHARMS, SHEETS, BRACELETS } = require("../catalog.js");
 const matcher = require("../matcher.js");
+global.window = global; // matcher reads window.CHARM_BRACELETS as a fallback
+global.CHARM_BRACELETS = BRACELETS;
 
 let passed = 0;
 function ok(name, cond) {
@@ -23,8 +25,16 @@ ok("every charm has required fields", CHARMS.every((c) =>
 const ids = CHARMS.map((c) => c.id);
 ok("charm ids are unique", new Set(ids).size === ids.length);
 ok("every charm points at a real sheet", CHARMS.every((c) => SHEETS[c.sheet]));
-ok("all five sheets are represented",
-  [1, 2, 3, 4, 5].every((s) => CHARMS.some((c) => String(c.sheet) === String(s))));
+ok("all nine sheets are represented",
+  [1, 2, 3, 4, 5, 6, 7, 8, 9].every((s) => CHARMS.some((c) => String(c.sheet) === String(s))));
+
+console.log("\nBracelets");
+ok("has the full bracelet range", BRACELETS.length === 16);
+ok("every bracelet has required fields", BRACELETS.every((b) =>
+  b.id && b.name && b.style && b.blurb && Array.isArray(b.vibe) && Array.isArray(b.fit)));
+const bcropDir = require("path").join(__dirname, "..", "charms", "crops");
+ok("every bracelet has a cropped image", BRACELETS.every((b) =>
+  require("fs").existsSync(require("path").join(bcropDir, b.id + ".webp"))));
 
 const fs = require("fs");
 const path = require("path");
@@ -65,5 +75,23 @@ ok("returns exactly the requested count", r.charms.length === 3);
 ok("each result carries a reason", r.charms.every((c) => typeof c.reason === "string" && c.reason.length));
 ok("returns a summary", typeof r.summary === "string" && r.summary.length > 0);
 ok("respects an empty/vague story with defaults", matcher.recommend("", 4, CHARMS).charms.length === 4);
+
+console.log("\nRecommendation extras (alternatives, swap pool, bracelet)");
+const rx = matcher.recommend("a cosy autumn with my cat and tea", 4, CHARMS);
+ok("returns a swap pool of the remaining charms",
+  Array.isArray(rx.pool) && rx.pool.length === CHARMS.length - 4);
+ok("pool never overlaps the displayed charms", (() => {
+  const shown = new Set(rx.charms.map((c) => c.id));
+  return rx.pool.every((c) => !shown.has(c.id));
+})());
+ok("offers alternatives", Array.isArray(rx.alternatives) && rx.alternatives.length > 0);
+ok("recommends a bracelet with a reason",
+  rx.bracelet && rx.bracelet.bracelet && rx.bracelet.bracelet.id &&
+  typeof rx.bracelet.reason === "string" && rx.bracelet.reason.length > 0);
+ok("bracelet offers other options to cycle",
+  Array.isArray(rx.bracelet.alternatives) && rx.bracelet.alternatives.length > 0);
+ok("a romantic story leans to a love-suited bracelet",
+  ["bracelet-toggle-heart", "bracelet-pearl-starburst", "bracelet-pearl-cross"]
+    .indexOf(matcher.recommend("a romantic valentine for my sweetheart", 3, CHARMS).bracelet.bracelet.id) >= 0);
 
 console.log("\nAll " + passed + " checks passed.");
