@@ -37,7 +37,16 @@ const client = hasKey ? new Anthropic() : null;
  * and asks Gemini's image model to render a lifestyle photo of a hand wearing
  * them. The key stays server-side, exactly like ANTHROPIC_API_KEY.            */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+// Known-good, generally-available image model. Used as the default and as an
+// automatic fallback if a configured/retired model name is rejected (404).
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-image";
+// Retired aliases we transparently upgrade so a stale env var still works.
+const RETIRED_GEMINI_MODELS = new Set(["gemini-2.5-flash-image-preview"]);
+let GEMINI_MODEL = process.env.GEMINI_IMAGE_MODEL || DEFAULT_GEMINI_MODEL;
+if (RETIRED_GEMINI_MODELS.has(GEMINI_MODEL)) {
+  console.warn("GEMINI_IMAGE_MODEL '" + GEMINI_MODEL + "' is retired — using '" + DEFAULT_GEMINI_MODEL + "' instead.");
+  GEMINI_MODEL = DEFAULT_GEMINI_MODEL;
+}
 const hasGemini = !!GEMINI_API_KEY;
 
 const CROPS_DIR = path.join(__dirname, "charms", "crops");
@@ -174,7 +183,7 @@ function mockupHint(msg, status) {
 }
 
 // POST the prompt + reference images to Gemini and resolve the first image part.
-function callGemini(parts) {
+function callGemini(parts, model) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({
       contents: [{ parts }],
@@ -183,7 +192,7 @@ function callGemini(parts) {
     const options = {
       method: "POST",
       hostname: "generativelanguage.googleapis.com",
-      path: "/v1beta/models/" + encodeURIComponent(GEMINI_MODEL) +
+      path: "/v1beta/models/" + encodeURIComponent(model) +
         ":generateContent?key=" + encodeURIComponent(GEMINI_API_KEY),
       headers: {
         "Content-Type": "application/json",
@@ -244,13 +253,28 @@ async function generateMockup(braceletId, charmIds) {
     usedCharms.push(id);
   }
 
-  const result = await callGemini(parts);
+  // Try the configured model; if the name is rejected (404 / unsupported),
+  // transparently fall back to the known-good GA model so a stale env var or
+  // retired alias never breaks the feature.
+  let model = GEMINI_MODEL;
+  let result;
+  try {
+    result = await callGemini(parts, model);
+  } catch (err) {
+    if (err && err.status === 404 && model !== DEFAULT_GEMINI_MODEL) {
+      console.warn("model '" + model + "' rejected (404) — retrying with '" + DEFAULT_GEMINI_MODEL + "'.");
+      model = DEFAULT_GEMINI_MODEL;
+      result = await callGemini(parts, model);
+    } else {
+      throw err;
+    }
+  }
   return {
     image: "data:" + result.mime + ";base64," + result.data,
     bracelet: braceletId,
     charms: usedCharms,
     engine: "gemini",
-    model: GEMINI_MODEL
+    model: model
   };
 }
 
