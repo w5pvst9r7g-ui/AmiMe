@@ -73,6 +73,10 @@ function buildMockupPrompt(names) {
     "- Hang the charms in a single row along the front of the bracelet, EVENLY SPACED " +
     "with clear, equal gaps between them. Each charm must be fully visible and separated — " +
     "they must NOT bunch up, overlap, touch or cluster together.\n" +
+    "- The bracelet is a SINGLE band that encircles the wrist exactly once, sitting " +
+    "naturally flat against the skin. It must look like one normal bracelet — do NOT " +
+    "wrap it around the wrist multiple times, and do NOT add extra strands, loops, " +
+    "layers or chains beyond the single bracelet shown in the reference.\n" +
     "- Exactly one bracelet, worn on the wrist; no extra jewellery.\n\n" +
     "Style: soft natural daylight, shallow depth of field, tasteful neutral background " +
     "(cafe table or outdoors), premium editorial product photography. Square crop, photorealistic."
