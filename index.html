@@ -301,7 +301,8 @@
     transition: transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s, border-color .3s;
   }
   .charm-card:hover { transform: translateY(-6px); box-shadow: var(--shadow); border-color: var(--gold-soft); }
-  .cc-media { position: relative; height: 180px; background: radial-gradient(circle at 50% 38%, #fffdf8, #f1e9d8); display: grid; place-items: center; overflow: hidden; }
+  .cc-media { position: relative; height: 180px; background: radial-gradient(circle at 50% 38%, #fffdf8, #f1e9d8); display: grid; place-items: center; overflow: hidden; cursor: pointer; }
+  .mini[data-cid] { cursor: pointer; }
   .cc-media img { max-width: 72%; max-height: 72%; filter: drop-shadow(0 12px 16px rgba(40,32,20,.2)); transition: transform .5s cubic-bezier(.2,.7,.3,1); }
   .charm-card:hover .cc-media img { transform: scale(1.08) rotate(-1deg); }
   .cc-cat { position: absolute; top: 12px; left: 12px; font-family: var(--sans); font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold-deep); background: rgba(255,255,255,.85); border: 1px solid var(--line); padding: 4px 9px; border-radius: 999px; }
@@ -386,6 +387,42 @@
   .footer-col a:hover { color: #fff; }
   .footer-bottom { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,.12); font-family: var(--sans); font-size: 12px; color: #8f897c; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 
+  /* hero marquee of real charms */
+  .hero-marquee { margin-top: 56px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+  .mq-track { display: flex; gap: 22px; width: max-content; animation: marquee 46s linear infinite; }
+  .mq-track.rev { animation-direction: reverse; margin-top: 18px; }
+  .hero-marquee:hover .mq-track { animation-play-state: paused; }
+  .mq-item { width: 74px; height: 74px; flex: 0 0 74px; display: grid; place-items: center;
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-sm); }
+  .mq-item img { max-width: 68%; max-height: 68%; filter: drop-shadow(0 6px 8px rgba(40,32,20,.18)); }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+
+  /* quick-view modal */
+  .qv-scrim { position: fixed; inset: 0; background: rgba(27,26,24,.5); opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s; z-index: 95; backdrop-filter: blur(3px); }
+  .qv-scrim.open { opacity: 1; visibility: visible; }
+  .qv-modal { position: fixed; z-index: 96; top: 50%; left: 50%; transform: translate(-50%, -46%) scale(.97);
+    width: 760px; max-width: 94vw; max-height: 90vh; overflow: auto; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 26px; box-shadow: var(--shadow-lg); opacity: 0; visibility: hidden;
+    transition: opacity .3s, visibility .3s, transform .3s cubic-bezier(.2,.7,.3,1);
+    display: grid; grid-template-columns: 1fr 1fr; }
+  .qv-modal.open { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+  .qv-media { position: relative; background: radial-gradient(circle at 50% 42%, #fffdf8, #efe5d2); display: grid; place-items: center; padding: 36px; min-height: 320px; border-radius: 26px 0 0 26px; }
+  .qv-media img { max-width: 80%; max-height: 320px; filter: drop-shadow(0 20px 26px rgba(40,32,20,.24)); }
+  .qv-body { padding: 40px 38px; display: flex; flex-direction: column; }
+  .qv-close { position: absolute; top: 16px; right: 18px; z-index: 2; cursor: pointer; background: rgba(255,255,255,.85); border: 1px solid var(--line); width: 34px; height: 34px; border-radius: 50%; font-size: 15px; color: var(--ink-soft); }
+  .qv-close:hover { color: var(--ink); }
+  .qv-body .cc-cat { position: static; display: inline-block; align-self: flex-start; margin-bottom: 12px; }
+  .qv-name { font-size: 38px; font-weight: 500; line-height: 1.05; }
+  .qv-price { font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--gold-deep); margin: 10px 0 16px; }
+  .qv-meaning { font-family: var(--serif); font-style: italic; font-size: 19px; color: var(--ink); margin: 0 0 18px; }
+  .qv-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 26px; }
+  .qv-tag { font-family: var(--sans); font-size: 11px; color: var(--ink-soft); background: var(--bg-3); border-radius: 999px; padding: 5px 11px; }
+  .qv-actions { margin-top: auto; }
+  .qv-actions .btn { width: 100%; justify-content: center; }
+  @media (max-width: 720px) { .qv-modal { grid-template-columns: 1fr; } .qv-media { border-radius: 26px 26px 0 0; min-height: 240px; } }
+
   /* reveal on scroll */
   .reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.3,1); }
   .reveal.in { opacity: 1; transform: none; }
@@ -451,6 +488,7 @@
           <span><span class="tk">✦</span> Styled by AI, finished by hand</span>
         </div>
       </div>
+      <div class="hero-marquee" id="heroMarquee" aria-hidden="true"></div>
     </section>
 
     <section class="section atelier" id="atelier">
@@ -565,6 +603,9 @@
       </div>
     </div>
   </footer>
+
+<div class="qv-scrim" id="qvScrim"></div>
+<div class="qv-modal" id="qvModal" role="dialog" aria-modal="true" aria-hidden="true"></div>
 
 <div class="bag-scrim" id="bagScrim"></div>
 <aside class="bag-drawer" id="bagDrawer" aria-hidden="true" aria-label="Your bag">
@@ -825,6 +866,8 @@
       '</div>';
     var btn = el.querySelector(".cc-swap");
     if (btn) btn.addEventListener("click", function () { swapAt(idx); });
+    var media = el.querySelector(".cc-media");
+    if (media) media.addEventListener("click", function () { openQuickView(c); });
     return el;
   }
 
@@ -1033,7 +1076,7 @@
   }
 
   function miniMarkup(c) {
-    return '<div class="mini">' +
+    return '<div class="mini" data-cid="' + esc(c.id) + '">' +
       '<div class="mini-img"><img src="' + cropPath(c) + '" alt="" loading="lazy" ' +
       'onerror="this.parentNode.textContent=\'' + c.emoji + '\'"></div>' +
       '<div><div class="mini-name">' + esc(c.name) + '</div>' +
@@ -1119,9 +1162,65 @@
     });
   }
 
+  function addCharmToBag(c) {
+    if (!bagHas(c.id)) { bag.push({ id: c.id, kind: "charm", name: c.name, price: priceOfCharm(c) }); saveBag(); updateBagCount(true); }
+    renderBag();
+  }
+
   updateBagCount();
 
+  // ---------- quick-view (product detail) ----------
+  var CHARM_BY_ID = {};
+  CATALOG.forEach(function (c) { CHARM_BY_ID[c.id] = c; });
+  var qvModal = $("qvModal"), qvScrim = $("qvScrim");
+
+  function openQuickView(c) {
+    if (!c) return;
+    var inBag = bagHas(c.id), price = priceOfCharm(c);
+    var tags = (c.tags || []).slice(0, 8).map(function (t) { return '<span class="qv-tag">' + esc(t) + '</span>'; }).join("");
+    qvModal.innerHTML =
+      '<button class="qv-close" id="qvClose" type="button" aria-label="Close">✕</button>' +
+      '<div class="qv-media"><img src="' + cropPath(c) + '" alt="' + esc(c.name) + '" onerror="this.style.display=\'none\'"></div>' +
+      '<div class="qv-body">' +
+        (c.category ? '<span class="cc-cat">' + esc(c.category) + '</span>' : '') +
+        '<h3 class="qv-name">' + esc(c.name) + '</h3>' +
+        '<div class="qv-price">' + money(price) + '</div>' +
+        '<p class="qv-meaning">' + esc(cap(c.meaning)) + '</p>' +
+        (tags ? '<div class="qv-tags">' + tags + '</div>' : '') +
+        '<div class="qv-actions"><button class="btn btn-gold" id="qvAdd" type="button"' + (inBag ? ' disabled' : '') + '>' +
+          (inBag ? 'In your bag ✓' : 'Add to bag · ' + money(price)) + '</button></div>' +
+      '</div>';
+    qvModal.classList.add("open"); qvScrim.classList.add("open"); qvModal.setAttribute("aria-hidden", "false");
+    $("qvClose").addEventListener("click", closeQuickView);
+    var add = $("qvAdd");
+    if (add) add.addEventListener("click", function () { addCharmToBag(c); add.disabled = true; add.textContent = "Added to bag ✓"; });
+  }
+  function closeQuickView() { qvModal.classList.remove("open"); qvScrim.classList.remove("open"); qvModal.setAttribute("aria-hidden", "true"); }
+  qvScrim.addEventListener("click", closeQuickView);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeQuickView(); });
+
+  // ---------- hero marquee from real charm assets ----------
+  (function buildMarquee() {
+    var host = $("heroMarquee"); if (!host) return;
+    var sample = [], step = Math.max(1, Math.floor(CATALOG.length / 26));
+    for (var i = 0; i < CATALOG.length && sample.length < 26; i += step) sample.push(CATALOG[i]);
+    function track(rev) {
+      var imgs = sample.concat(sample).map(function (c) {
+        return '<div class="mq-item"><img src="' + cropPath(c) + '" alt="" loading="lazy" onerror="this.parentNode.style.display=\'none\'"></div>';
+      }).join("");
+      return '<div class="mq-track' + (rev ? " rev" : "") + '">' + imgs + '</div>';
+    }
+    host.innerHTML = track(false) + track(true);
+  })();
+
   buildCatalogue();
+
+  // open quick-view from any charm tile in the collections gallery
+  $("catalogue").addEventListener("click", function (e) {
+    var m = e.target.closest ? e.target.closest("[data-cid]") : null;
+    if (!m) return;
+    openQuickView(CHARM_BY_ID[m.getAttribute("data-cid")]);
+  });
   observeReveals(document);
   setEngineNote();
   probeBackend();
