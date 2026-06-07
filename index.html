@@ -111,6 +111,61 @@
     background: var(--ink); color: #fff; border-radius: 999px; min-width: 24px; height: 24px;
     display: grid; place-items: center; font-size: 12px; padding: 0 7px;
   }
+  .bag-btn {
+    position: relative; cursor: pointer; background: var(--bg-2); border: 1px solid var(--line-strong);
+    width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--ink);
+    transition: border-color .25s, box-shadow .25s, transform .2s;
+  }
+  .bag-btn:hover { border-color: var(--gold-soft); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .bag-count {
+    position: absolute; top: -5px; right: -5px; min-width: 20px; height: 20px; padding: 0 5px;
+    background: var(--gold); color: #fff; border-radius: 999px; font-family: var(--sans); font-size: 11px;
+    display: grid; place-items: center; border: 2px solid var(--bg); transition: transform .2s;
+  }
+  .bag-count.zero { display: none; }
+  .bag-count.bump { animation: bump .35s ease; }
+  @keyframes bump { 0%,100%{transform:scale(1)} 40%{transform:scale(1.35)} }
+
+  /* bag drawer */
+  .bag-scrim { position: fixed; inset: 0; background: rgba(27,26,24,.42); opacity: 0; visibility: hidden; transition: opacity .3s, visibility .3s; z-index: 80; backdrop-filter: blur(2px); }
+  .bag-scrim.open { opacity: 1; visibility: visible; }
+  .bag-drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: 420px; max-width: 92vw; z-index: 90;
+    background: var(--bg); border-left: 1px solid var(--line); box-shadow: -30px 0 80px -40px rgba(40,32,20,.6);
+    transform: translateX(100%); transition: transform .38s cubic-bezier(.2,.7,.3,1);
+    display: flex; flex-direction: column;
+  }
+  .bag-drawer.open { transform: none; }
+  .bag-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 26px 26px 18px; border-bottom: 1px solid var(--line); }
+  .bag-title { font-size: 26px; font-weight: 500; margin-top: 4px; }
+  .bag-close { cursor: pointer; background: none; border: none; font-size: 18px; color: var(--ink-soft); padding: 4px; line-height: 1; }
+  .bag-close:hover { color: var(--ink); }
+  .bag-items { flex: 1; overflow-y: auto; padding: 12px 26px; }
+  .bag-empty { text-align: center; color: var(--ink-faint); font-family: var(--sans); font-size: 14px; padding: 60px 20px; }
+  .bag-empty .be-mark { font-family: var(--serif); font-style: italic; font-size: 30px; color: var(--gold-soft); display: block; margin-bottom: 10px; }
+  .bag-line { display: flex; gap: 14px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .bag-line .bl-img { width: 56px; height: 56px; flex: 0 0 56px; border-radius: 12px; background: radial-gradient(circle at 50% 40%, #fffdf8, #f1e9d8); display: grid; place-items: center; border: 1px solid var(--line); }
+  .bag-line .bl-img img { max-width: 78%; max-height: 78%; filter: drop-shadow(0 4px 6px rgba(40,32,20,.18)); }
+  .bag-line .bl-info { flex: 1; min-width: 0; }
+  .bag-line .bl-name { font-family: var(--serif); font-size: 18px; font-weight: 600; line-height: 1.15; }
+  .bag-line .bl-kind { font-family: var(--sans); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); }
+  .bag-line .bl-price { font-family: var(--sans); font-size: 14px; color: var(--ink); }
+  .bag-line .bl-remove { cursor: pointer; background: none; border: none; color: var(--ink-faint); font-size: 12px; font-family: var(--sans); padding: 2px; }
+  .bag-line .bl-remove:hover { color: #b0503f; }
+  .bag-foot { padding: 20px 26px 26px; border-top: 1px solid var(--line); background: var(--bg-2); }
+  .bag-subtotal { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .bag-subtotal .lbl { font-family: var(--sans); font-size: 13px; letter-spacing: .04em; color: var(--ink-soft); }
+  .bag-subtotal .val { font-family: var(--serif); font-size: 30px; font-weight: 600; }
+  .bag-ship { font-family: var(--sans); font-size: 12px; color: var(--ink-faint); margin-bottom: 16px; }
+  .bag-foot .btn { width: 100%; justify-content: center; }
+  .bag-confirm { text-align: center; padding: 16px 8px 4px; }
+  .bag-confirm .bc-mark { font-size: 26px; color: var(--gold); }
+  .bag-confirm p { font-family: var(--sans); font-size: 13.5px; color: var(--ink-soft); margin: 8px 0 0; }
+
+  /* prices on cards */
+  .cc-price { font-family: var(--sans); font-size: 15px; font-weight: 500; color: var(--gold-deep); margin: 2px 0 8px; }
+  .bh-price { font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--gold-deep); margin: 2px 0 18px; }
+  .bh-price .bh-from { font-family: var(--sans); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); display: block; margin-bottom: 2px; }
 
   /* ---------- hero ---------- */
   .hero { position: relative; padding: 92px 0 70px; text-align: center; overflow: hidden; }
@@ -368,6 +423,14 @@
         <span id="selectionLabel">Your bracelet</span>
         <span class="count-badge" id="selectionCount">0</span>
       </button>
+      <button class="bag-btn" id="bagBtn" type="button" aria-label="Open bag">
+        <span class="bag-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/>
+          </svg>
+        </span>
+        <span class="bag-count" id="bagCount">0</span>
+      </button>
     </div>
   </header>
 
@@ -502,6 +565,19 @@
       </div>
     </div>
   </footer>
+
+<div class="bag-scrim" id="bagScrim"></div>
+<aside class="bag-drawer" id="bagDrawer" aria-hidden="true" aria-label="Your bag">
+  <div class="bag-head">
+    <div>
+      <div class="eyebrow">Your bag</div>
+      <h3 class="bag-title">The shopping bag</h3>
+    </div>
+    <button class="bag-close" id="bagClose" type="button" aria-label="Close bag">✕</button>
+  </div>
+  <div class="bag-items" id="bagItems"></div>
+  <div class="bag-foot" id="bagFoot"></div>
+</aside>
 
 <script src="catalog.js"></script>
 <script src="matcher.js"></script>
@@ -739,6 +815,7 @@
       '</div>' +
       '<div class="cc-body">' +
         '<h3 class="cc-name">' + esc(c.name) + '</h3>' +
+        '<div class="cc-price">' + money(priceOfCharm(c)) + '</div>' +
         '<p class="cc-meaning">' + esc(cap(c.meaning)) + '</p>' +
         (c.reason ? '<p class="cc-reason">' + esc(c.reason) + '</p>' : '') +
         '<div class="cc-foot">' +
@@ -807,10 +884,13 @@
         '<div class="bh-body">' +
           '<span class="eyebrow">Your bracelet</span>' +
           '<h3 class="bh-name">' + esc(br.name) + '</h3>' +
+          '<div class="bh-price"><span class="bh-from">Bracelet + ' + state.displayed.length +
+            ' charm' + (state.displayed.length === 1 ? '' : 's') + '</span>' + money(bundleTotal()) + '</div>' +
           '<p class="bh-reason">' + esc(reason || "") + '</p>' +
           '<div class="bh-actions">' +
             (state.brOptions.length > 1 ? '<button class="btn btn-ghost br-swap" type="button">Try another style ⟳</button>' : '') +
-            (geminiAvailable ? '<button class="btn btn-gold br-mockup" type="button">Preview on your wrist ✦</button>' : '') +
+            (geminiAvailable ? '<button class="btn btn-ghost br-mockup" type="button">Preview on your wrist ✦</button>' : '') +
+            '<button class="btn btn-gold br-addbag" type="button">Add to bag · ' + money(bundleTotal()) + '</button>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -824,6 +904,8 @@
     });
     var mk = braceletEl.querySelector(".br-mockup");
     if (mk) mk.addEventListener("click", function () { generateMockup(br); });
+    var ab = braceletEl.querySelector(".br-addbag");
+    if (ab) ab.addEventListener("click", function () { addBundleToBag(br); });
   }
 
   // Ask the Gemini-powered backend to render the chosen bracelet + charms on a wrist.
@@ -961,6 +1043,83 @@
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (m) {
     return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]; }); }
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  // ---------- pricing + shopping bag ----------
+  var BRACELET_PRICE = { classic:78, station:88, elegant:98, minimal:68, beaded:82,
+    dainty:72, modern:90, adjustable:74, bold:96, sleek:92, paperclip:84 };
+  function hashStr(s) { var h = 0; s = String(s || ""); for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; } return h; }
+  function priceOfCharm(c) { return 35 + (hashStr(c.id) % 5) * 5; }          // £35–£55, stable per charm
+  function priceOfBracelet(b) { return (b && BRACELET_PRICE[b.style]) || 79; }
+  function money(n) { return "£" + Math.round(n); }
+  function bundleTotal() {
+    var t = 0;
+    if (state.brOptions.length) t += priceOfBracelet(state.brOptions[state.brIdx]);
+    state.displayed.forEach(function (c) { t += priceOfCharm(c); });
+    return t;
+  }
+
+  var BAG_KEY = "amime_bag_v1";
+  var bag = loadBag();
+  function loadBag() { try { return JSON.parse(localStorage.getItem(BAG_KEY)) || []; } catch (e) { return []; } }
+  function saveBag() { try { localStorage.setItem(BAG_KEY, JSON.stringify(bag)); } catch (e) {} }
+
+  var bagDrawer = $("bagDrawer"), bagScrim = $("bagScrim");
+  $("bagBtn").addEventListener("click", openBag);
+  $("bagClose").addEventListener("click", closeBag);
+  bagScrim.addEventListener("click", closeBag);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeBag(); });
+
+  function openBag() { renderBag(); bagDrawer.classList.add("open"); bagScrim.classList.add("open"); bagDrawer.setAttribute("aria-hidden", "false"); }
+  function closeBag() { bagDrawer.classList.remove("open"); bagScrim.classList.remove("open"); bagDrawer.setAttribute("aria-hidden", "true"); }
+
+  function bagHas(id) { return bag.some(function (it) { return it.id === id; }); }
+  function addBundleToBag(br) {
+    if (br && !bagHas(br.id)) bag.push({ id: br.id, kind: "bracelet", name: br.name, price: priceOfBracelet(br) });
+    state.displayed.forEach(function (c) {
+      if (!bagHas(c.id)) bag.push({ id: c.id, kind: "charm", name: c.name, price: priceOfCharm(c) });
+    });
+    saveBag(); updateBagCount(true); renderBag(); openBag();
+  }
+  function removeFromBag(id) { bag = bag.filter(function (it) { return it.id !== id; }); saveBag(); updateBagCount(); renderBag(); }
+  function cropById(id) { return (window.__CROPS && window.__CROPS[id]) ? window.__CROPS[id] : "charms/crops/" + id + ".webp"; }
+
+  function updateBagCount(bump) {
+    var el = $("bagCount"); el.textContent = bag.length;
+    el.classList.toggle("zero", bag.length === 0);
+    if (bump) { el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump"); }
+  }
+
+  function renderBag() {
+    var items = $("bagItems"), foot = $("bagFoot");
+    if (!bag.length) {
+      items.innerHTML = '<div class="bag-empty"><span class="be-mark">✦</span>Your bag is empty.<br>Compose a bracelet and add it here.</div>';
+      foot.innerHTML = ""; return;
+    }
+    items.innerHTML = bag.map(function (it) {
+      return '<div class="bag-line">' +
+        '<div class="bl-img"><img src="' + cropById(it.id) + '" alt="" onerror="this.style.display=\'none\'"></div>' +
+        '<div class="bl-info"><div class="bl-kind">' + esc(it.kind) + '</div>' +
+          '<div class="bl-name">' + esc(it.name) + '</div>' +
+          '<button class="bl-remove" type="button" data-id="' + esc(it.id) + '">Remove</button></div>' +
+        '<div class="bl-price">' + money(it.price) + '</div>' +
+      '</div>';
+    }).join("");
+    var subtotal = bag.reduce(function (s, it) { return s + it.price; }, 0);
+    foot.innerHTML =
+      '<div class="bag-subtotal"><span class="lbl">Subtotal</span><span class="val">' + money(subtotal) + '</span></div>' +
+      '<div class="bag-ship">Complimentary shipping &amp; gift wrapping on every order.</div>' +
+      '<button class="btn btn-dark" id="bagCheckout" type="button">Proceed to checkout</button>';
+    Array.prototype.forEach.call(items.querySelectorAll(".bl-remove"), function (b) {
+      b.addEventListener("click", function () { removeFromBag(b.getAttribute("data-id")); });
+    });
+    $("bagCheckout").addEventListener("click", function () {
+      foot.innerHTML = '<div class="bag-confirm"><div class="bc-mark">✦</div>' +
+        '<p>Thank you. This is a preview atelier — checkout isn\'t live yet, but your ' + bag.length +
+        '-piece selection is ready to be made by hand.</p></div>';
+    });
+  }
+
+  updateBagCount();
 
   buildCatalogue();
   observeReveals(document);
