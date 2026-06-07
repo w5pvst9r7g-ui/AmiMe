@@ -18,22 +18,35 @@ against it.
 
 ## Try it
 
-**No setup (instant, on-device matcher):**
+Easiest first.
+
+**A) One file, works on your phone (no server, no internet)** ← simplest for iOS
+`amime-charm-matcher.html` is the **entire app in a single self-contained file**
+(catalogue, matcher, and all 95 charm images embedded). To test on an iPhone:
+AirDrop / email / save it to iCloud Drive, then open it in **Files → tap → it
+opens in Safari**. Or just double-click it on any computer. ~2.9 MB, fully
+offline. Rebuild it after changes with `python3 tools/build_standalone.py`.
+
+**B) Shareable URL (GitHub Pages)**
+This branch includes a Pages workflow (`.github/workflows/pages.yml`). If Pages
+is available for the repo, every push publishes the site to a public URL you can
+open in iOS Safari. Check **Actions → Deploy to GitHub Pages** for the link.
+
+**C) Local static server**
 
 ```sh
-# any static server works; e.g.
-python3 -m http.server 8000
-# open http://localhost:8000
+python3 -m http.server 8000      # then open http://localhost:8000
 ```
 
-Just opening `index.html` in a browser works too.
+(Just opening `index.html` directly also works, though some browsers block the
+local `.webp`/`.js` files over `file://` — use option A for offline.)
 
-**With Claude (true semantic understanding):**
+**D) With Claude (true semantic understanding)**
 
 ```sh
 npm install
 export ANTHROPIC_API_KEY=sk-ant-...
-npm start                 # http://localhost:3000
+npm start                        # http://localhost:3000
 ```
 
 The front-end auto-detects the backend: if `server.js` is running with a key,
@@ -48,8 +61,11 @@ little dot under the composer tells you which engine answered.
 | `matcher.js` | Zero-dependency, offline matcher. Tokenises the story, expands it with a synonym map, scores every charm, diversifies, returns the best `N` with reasons. |
 | `index.html` | Self-contained front-end: story composer, charm-count slider, results, and a browsable catalogue showing the original product sheets. |
 | `server.js` | Optional Node backend. Serves the page and a `POST /api/recommend` endpoint that asks **Claude (`claude-opus-4-8`)** to pick charms with structured-output JSON. |
-| `charms/` | The five source product photos. |
-| `test/smoke.test.js` | Catalogue integrity + matcher relevance checks (`npm run check`). |
+| `amime-charm-matcher.html` | **The whole app as one self-contained file** (built artifact) — best for offline / iOS testing. |
+| `charms/` | The five source product photos + `charms/crops/` (one cropped image per charm). |
+| `tools/crop_charms.py` | Auto-crops each charm from the sheets and matches it to its catalogue id by position. |
+| `tools/build_standalone.py` | Bundles everything into `amime-charm-matcher.html`. |
+| `test/smoke.test.js` | Catalogue integrity, crop coverage, and matcher relevance checks (`npm run check`). |
 
 ## The catalogue
 
@@ -98,8 +114,8 @@ This POC is intentionally framework-free so it maps cleanly onto a store:
 
 ## Notes & limitations (it's a POC)
 
-- Charms are shown via emoji + the source photo sheet, not individually cropped
-  product images — swap in real assets for production.
+- Charm images are auto-cropped from the product sheets (`tools/crop_charms.py`).
+  They're good enough to test with; for production, swap in clean studio cutouts.
 - Charm identification is from photos; double-check names/meanings against your
   actual product copy.
 - The on-device synonym map is hand-tuned and English-only; Claude handles the

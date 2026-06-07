@@ -26,6 +26,15 @@ ok("every charm points at a real sheet", CHARMS.every((c) => SHEETS[c.sheet]));
 ok("all five sheets are represented",
   [1, 2, 3, 4, 5].every((s) => CHARMS.some((c) => String(c.sheet) === String(s))));
 
+const fs = require("fs");
+const path = require("path");
+const cropDir = path.join(__dirname, "..", "charms", "crops");
+if (fs.existsSync(cropDir)) {
+  console.log("\nCharm crops");
+  ok("every charm has a cropped image",
+    CHARMS.every((c) => fs.existsSync(path.join(cropDir, c.id + ".webp"))));
+}
+
 console.log("\nLocal matcher relevance");
 function topIds(story, n) {
   return matcher.recommend(story, n, CHARMS).charms.map((c) => c.id);
