@@ -61,6 +61,22 @@ The front-end auto-detects the backend: if `server.js` is running with a key,
 it uses Claude; otherwise it silently falls back to the on-device matcher. The
 little dot under the composer tells you which engine answered.
 
+**E) See it on a wrist (Gemini image mock-up)**
+
+```sh
+export GEMINI_API_KEY=...         # Google AI Studio key
+# optional: export GEMINI_IMAGE_MODEL=gemini-2.5-flash-image-preview
+npm start
+```
+
+With `GEMINI_API_KEY` set in the environment, the recommended-bracelet card
+gains a **"See it on a wrist ✦"** button. It sends the chosen bracelet cut-out
+plus your selected charm cut-outs to Gemini's image model (`POST /api/mockup`)
+and renders a lifestyle photo of the piece worn on a hand. The key stays
+server-side, just like `ANTHROPIC_API_KEY`; if it isn't set, the button simply
+doesn't appear. Each change to the charms/bracelet clears the old mock-up so
+you can regenerate it for the new combination.
+
 ## What's in here
 
 | File | Purpose |
@@ -68,7 +84,7 @@ little dot under the composer tells you which engine answered.
 | `catalog.js` | **The catalogue** — 167 charms across 9 sheets + 16 bracelets, each with name, meaning, source + position, and matching tags/vibe. Works in the browser and Node. |
 | `matcher.js` | Zero-dependency, offline matcher. Scores every charm, diversifies, returns the best `N` with reasons, **plus** a swap pool, alternatives, and a bracelet recommendation. |
 | `index.html` | Self-contained front-end: story composer, results with per-charm **swap**, an **alternatives** menu, a **recommended bracelet** (cyclable), and a browsable catalogue. |
-| `server.js` | Optional Node backend. `POST /api/recommend` asks **Claude (`claude-opus-4-8`)** to pick charms with structured-output JSON. |
+| `server.js` | Optional Node backend. `POST /api/recommend` asks **Claude (`claude-opus-4-8`)** to pick charms with structured-output JSON; `POST /api/mockup` asks **Gemini** to render the bracelet + charms worn on a wrist (needs `GEMINI_API_KEY`). |
 | `amime-charm-matcher.html` | **The whole app as one self-contained file** (built artifact) — best for offline / iOS testing. |
 | `charms/` | The nine source product photos + bracelet sheet + `charms/crops/` (one transparent cut-out per charm and bracelet). |
 | `tools/ai_crop.py` | **AI cut-out pipeline** — `rembg` matte → connected components → clean, centred, transparent WebP per charm (Voronoi-splits touching charms, ignores decorations). |

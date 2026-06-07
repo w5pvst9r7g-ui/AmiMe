@@ -161,11 +161,47 @@
   }
   .bracelet-card h3 { margin: 0 0 6px; font-size: 23px; }
   .bracelet-card p { margin: 0 0 12px; color: var(--ink-soft); font-size: 14.5px; }
-  .br-swap {
+  .br-swap, .br-mockup {
     cursor:pointer; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; font-weight:600;
     color: var(--ink); background:#fff; border:1px solid var(--line); border-radius:999px; padding:7px 14px;
   }
   .br-swap:hover { background: var(--gold-soft); border-color: var(--gold); }
+  .br-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .br-mockup {
+    color:#fff; border:none;
+    background: linear-gradient(180deg, #b08642, #97712f);
+    box-shadow: 0 10px 20px -12px rgba(176,134,66,.8);
+  }
+  .br-mockup:hover { transform: translateY(-1px); }
+  .br-mockup:disabled { opacity:.55; cursor:progress; transform:none; }
+
+  /* generated "on the wrist" mock-up */
+  #mockup:empty { display:none; }
+  .mockup-card {
+    margin: 0 0 26px; background: var(--paper-2); border:1px solid var(--gold-soft);
+    border-radius: 18px; padding: 18px 22px; box-shadow: var(--shadow);
+  }
+  .mockup-card .mk-kicker {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing:.08em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 10px;
+  }
+  .mockup-card img.mk-img {
+    width: 100%; max-width: 520px; display:block; margin: 0 auto; border-radius: 14px;
+    border:1px solid var(--line); box-shadow: 0 14px 30px -18px rgba(32,48,63,.5);
+  }
+  .mockup-card .mk-note {
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; color: var(--ink-soft);
+    margin: 12px 0 0; text-align:center;
+  }
+  .mockup-card .mk-note.error { color: #b04a3a; }
+  .mk-spinner {
+    width: 100%; max-width:520px; height: 280px; margin: 0 auto; border-radius:14px;
+    background: linear-gradient(110deg, #f3ead4 8%, #fbf6ea 18%, #f3ead4 33%);
+    background-size: 200% 100%; animation: mk-shimmer 1.2s linear infinite;
+    display:grid; place-items:center; color: var(--gold); font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 13px;
+  }
+  @keyframes mk-shimmer { to { background-position: -200% 0; } }
 
   /* alternatives menu */
   details.alts { margin-top: 24px; border:1px solid var(--line); border-radius: 14px; background: var(--paper-2); overflow:hidden; }
@@ -264,6 +300,7 @@
   <section class="results hidden" id="results">
     <p class="narrative" id="narrative"></p>
     <div id="bracelet"></div>
+    <div id="mockup"></div>
     <div id="resultTools"></div>
     <div class="grid" id="cards"></div>
     <div id="altWrap"></div>
@@ -292,7 +329,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var storyEl = $("story"), countEl = $("count"), countVal = $("countVal");
   var goEl = $("go"), resultsEl = $("results"), cardsEl = $("cards"), narrativeEl = $("narrative");
-  var braceletEl = $("bracelet"), altWrap = $("altWrap");
+  var braceletEl = $("bracelet"), mockupEl = $("mockup"), altWrap = $("altWrap");
   var engineNote = $("engineNote");
   var BRACELETS = window.CHARM_BRACELETS || [];
 
@@ -302,6 +339,7 @@
                 bracelet: null, brOptions: [], brIdx: 0, altsOpen: false };
 
   var backendAvailable = false;
+  var geminiAvailable = false;
 
   countEl.addEventListener("input", function () { countVal.textContent = countEl.value; });
 
@@ -324,8 +362,9 @@
         return r.ok ? r.json() : null;
       }).then(function (j) {
         backendAvailable = !!(j && j.ok && j.claude);
+        geminiAvailable = !!(j && j.ok && j.gemini);
         setEngineNote();
-      }).catch(function () { backendAvailable = false; setEngineNote(); });
+      }).catch(function () { backendAvailable = false; geminiAvailable = false; setEngineNote(); });
     } catch (e) { backendAvailable = false; setEngineNote(); }
   }
 
@@ -522,6 +561,7 @@
 
   // ---- recommended bracelet ----
   function setBracelet(rec) {
+    mockupEl.innerHTML = "";   // any change to bracelet/charms invalidates the mock-up
     state.bracelet = rec;
     if (rec && rec.bracelet) {
       state.brOptions = [rec.bracelet].concat(rec.alternatives || []);
@@ -543,13 +583,54 @@
           '<div class="br-kicker">Recommended bracelet</div>' +
           '<h3>' + esc(br.name) + '</h3>' +
           '<p>' + esc(reason || "") + '</p>' +
-          (state.brOptions.length > 1 ? '<button class="br-swap" type="button">Show another bracelet ⟳</button>' : '') +
+          '<div class="br-actions">' +
+            (state.brOptions.length > 1 ? '<button class="br-swap" type="button">Show another bracelet ⟳</button>' : '') +
+            (geminiAvailable ? '<button class="br-mockup" type="button">See it on a wrist ✦</button>' : '') +
+          '</div>' +
         '</div>' +
       '</div>';
     var bs = braceletEl.querySelector(".br-swap");
     if (bs) bs.addEventListener("click", function () {
       state.brIdx = (state.brIdx + 1) % state.brOptions.length;
+      mockupEl.innerHTML = "";   // the mock-up is for a specific bracelet
       renderBracelet();
+    });
+    var mk = braceletEl.querySelector(".br-mockup");
+    if (mk) mk.addEventListener("click", function () { generateMockup(br); });
+  }
+
+  // Ask the Gemini-powered backend to render the chosen bracelet + charms on a wrist.
+  function generateMockup(br) {
+    var charmIds = state.displayed.map(function (c) { return c.id; });
+    mockupEl.innerHTML =
+      '<div class="mockup-card">' +
+        '<div class="mk-kicker">Your bracelet, on a wrist</div>' +
+        '<div class="mk-spinner">Painting your ' + esc(br.name) + '… this can take a moment ✦</div>' +
+      '</div>';
+    mockupEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    fetch("/api/mockup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bracelet: br.id, charms: charmIds })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("mockup error");
+      return r.json();
+    }).then(function (data) {
+      if (!data || !data.image) throw new Error("no image");
+      mockupEl.innerHTML =
+        '<div class="mockup-card">' +
+          '<div class="mk-kicker">Your bracelet, on a wrist</div>' +
+          '<img class="mk-img" src="' + data.image + '" alt="Mock-up of ' + esc(br.name) + ' worn on a wrist">' +
+          '<p class="mk-note">An AI impression of the ' + esc(br.name) +
+            ' with your charms — a styling preview, not the final piece.</p>' +
+        '</div>';
+    }).catch(function () {
+      mockupEl.innerHTML =
+        '<div class="mockup-card">' +
+          '<div class="mk-kicker">Your bracelet, on a wrist</div>' +
+          '<p class="mk-note error">Sorry — the mock-up couldn\'t be generated just now. Please try again.</p>' +
+        '</div>';
     });
   }
 
