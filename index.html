@@ -457,8 +457,11 @@
     state.displayed.forEach(function (c) { shown[c.id] = true; });
     var pool = data.pool && data.pool.length ? data.pool.slice() : null;
     if (!pool) {
-      // AI path returns only the picks; derive a pool from the local matcher.
-      var local = window.CharmMatcher.recommend(story, CATALOG.length, CATALOG);
+      // AI path returns only the picks (no pool). Ask the local matcher for a
+      // small pick set so its `pool` is the full ranked remainder, then drop
+      // anything already shown. (Asking for CATALOG.length picks would leave an
+      // empty pool and disable every Swap button.)
+      var local = window.CharmMatcher.recommend(story, state.displayed.length || count || 5, CATALOG);
       pool = local.pool || [];
     }
     state.pool = pool.filter(function (c) { return !shown[c.id]; });
