@@ -186,6 +186,17 @@
   .alt .alt-name { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; line-height: 1.25; color: var(--ink); }
   .alt-hint { padding: 2px 18px 16px; color: var(--ink-soft); font-size: 12.5px; font-family: ui-sans-serif, system-ui, sans-serif; }
 
+  /* result tools (revert) */
+  #resultTools:empty { display: none; }
+  #resultTools { display: flex; justify-content: flex-end; margin: 0 0 12px; }
+  .revert {
+    cursor: pointer; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--ink); background: #fff; border: 1px solid var(--gold-soft);
+    border-radius: 999px; padding: 8px 15px;
+  }
+  .revert:hover { background: var(--gold-soft); border-color: var(--gold); }
+  .revert .muted-inline { color: var(--ink-soft); font-weight: 400; }
+
   /* catalogue */
   .cat-head { display:flex; align-items:baseline; justify-content:space-between; margin: 56px 0 6px; }
   h2 { font-size: 28px; margin: 0; }
@@ -253,6 +264,7 @@
   <section class="results hidden" id="results">
     <p class="narrative" id="narrative"></p>
     <div id="bracelet"></div>
+    <div id="resultTools"></div>
     <div class="grid" id="cards"></div>
     <div id="altWrap"></div>
   </section>
@@ -406,10 +418,40 @@
     narrativeEl.textContent = data.summary || "";
     setBracelet(data.bracelet ||
       window.CharmMatcher.recommendBracelet(story, state.displayed, BRACELETS));
+
+    // Snapshot the original recommendation so the customer can always revert.
+    state.original = {
+      displayed: state.displayed.slice(),
+      pool: state.pool.slice(),
+      bracelet: state.bracelet
+    };
+    state.dirty = false;
+
     renderCards();
     renderAlternatives();
+    renderTools();
     resultsEl.classList.remove("hidden");
     resultsEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function revert() {
+    if (!state.original) return;
+    state.displayed = state.original.displayed.slice();
+    state.pool = state.original.pool.slice();
+    setBracelet(state.original.bracelet);
+    state.dirty = false;
+    renderCards();
+    renderAlternatives();
+    renderTools();
+  }
+
+  // The revert control only appears once the customer has changed something.
+  function renderTools() {
+    var host = $("resultTools");
+    if (!state.dirty) { host.innerHTML = ""; return; }
+    host.innerHTML = '<button class="revert" type="button">↺ Revert to original recommendation' +
+      ' <span class="muted-inline">(undo my changes)</span></button>';
+    host.querySelector(".revert").addEventListener("click", revert);
   }
 
   function cropPath(c) {
@@ -472,8 +514,10 @@
   function afterChange() {
     // The bracelet leans on the mix of charms, so re-suggest it on every change.
     setBracelet(window.CharmMatcher.recommendBracelet(state.story, state.displayed, BRACELETS));
+    state.dirty = true;
     renderCards();
     renderAlternatives();
+    renderTools();
   }
 
   // ---- recommended bracelet ----

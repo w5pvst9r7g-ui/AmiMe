@@ -31,10 +31,13 @@ SHEETS = {
     4: "charms/sheet-4-folk-oval.jpeg",
     5: "charms/sheet-5-terracotta.jpeg",
 }
-CANVAS = 400          # output square size
-FILL = 0.86           # longest charm side as fraction of canvas
+CANVAS = 512          # output square size (higher-res, crisper on the site)
+FILL = 0.86           # legacy longest-side fraction (unused once normalised)
 MIN_AREA = 0.0012     # ignore blobs smaller than this fraction of the sheet
 ALPHA_FLOOR = 30      # alpha below this is treated as background
+NORM_TARGET_W = 0.66  # body width as a fraction of the canvas (alignment)
+NORM_CENTER_Y = 0.52  # where the body's centre of mass sits vertically
+NORM_SHARPEN = True   # light unsharp mask to crispen the upscaled cut-out
 
 _session = None
 def session():
@@ -99,15 +102,53 @@ def square_from(orig, alpha_mask, box):
     a = a[by0:by1, bx0:bx1]
     rgba = np.dstack([rgb, a]).astype(np.uint8)
     im = Image.fromarray(rgba, "RGBA")
-    # scale longest side to FILL*CANVAS
-    scale = (CANVAS * FILL) / max(im.width, im.height)
-    nw, nh = max(1, round(im.width * scale)), max(1, round(im.height * scale))
-    im = im.resize((nw, nh), Image.LANCZOS)
     # soften the matte edge a touch to remove any fringe
     alpha_ch = im.split()[3].filter(ImageFilter.GaussianBlur(0.6))
     im.putalpha(alpha_ch)
-    canvas = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
-    canvas.alpha_composite(im, ((CANVAS - nw) // 2, (CANVAS - nh) // 2))
+    # body-aware normalisation: consistent size + centre-of-mass alignment
+    return normalize_crop(im, CANVAS, target_w=NORM_TARGET_W, center_y=NORM_CENTER_Y)
+
+
+def normalize_crop(rgba, N=None, target_w=0.66, center_y=0.52, max_w=0.96, max_h=0.92):
+    """Re-centre/scale a transparent charm so every charm reads as the same
+    visual size and its body sits on the same line.
+
+    - scale so the body *width* is a consistent fraction (round pendants then
+      match), capped so nothing overflows — tall pieces (guitar) cap on height;
+    - align by alpha centre-of-mass, not bbox, so a long jump-ring/bail pushes
+      *up* off the body instead of dragging the body downward.
+    """
+    N = N or CANVAS
+    arr = np.asarray(rgba)
+    a = arr[:, :, 3]
+    ys, xs = np.where(a > ALPHA_FLOOR)
+    if len(xs) == 0:
+        return rgba.resize((N, N))
+    x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+    content = rgba.crop((x0, y0, x1, y1))
+    cw, ch = content.size
+    scale = (N * target_w) / cw
+    if ch * scale > N * max_h:
+        scale = (N * max_h) / ch
+    if cw * scale > N * max_w:
+        scale = (N * max_w) / cw
+    nw, nh = max(1, round(cw * scale)), max(1, round(ch * scale))
+    content = content.resize((nw, nh), Image.LANCZOS)
+    if NORM_SHARPEN:
+        r, g, b, al = content.split()
+        rgb = Image.merge("RGB", (r, g, b)).filter(
+            ImageFilter.UnsharpMask(radius=1.4, percent=85, threshold=2))
+        content = Image.merge("RGBA", (*rgb.split(), al))
+    # centre of mass within the resized content
+    ca = np.asarray(content)[:, :, 3]
+    cys, cxs = np.where(ca > ALPHA_FLOOR)
+    com_x, com_y = cxs.mean(), cys.mean()
+    ox = int(round(N / 2 - com_x))
+    oy = int(round(N * center_y - com_y))
+    ox = max(min(ox, N - nw), 0) if nw <= N else (N - nw) // 2
+    oy = max(min(oy, N - nh), 0) if nh <= N else (N - nh) // 2
+    canvas = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    canvas.alpha_composite(content, (ox, oy))
     return canvas
 
 
