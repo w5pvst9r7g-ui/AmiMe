@@ -4,6 +4,10 @@ name: Deploy to GitHub Pages
 # Safari) at the repo's Pages URL. The site uses the on-device matcher — no
 # backend or API key is involved. (Public hosting authorised by the repo owner.)
 
+# NOTE: the github-pages environment is authorised only for the
+# claude/charm-story-matcher-poc-BpNJF branch, which is kept in sync with main.
+# Pages serves the static front-end only; the Gemini wrist mock-up needs the
+# Node backend (deploy that via render.yaml).
 on:
   push:
     branches: ["claude/charm-story-matcher-poc-BpNJF"]

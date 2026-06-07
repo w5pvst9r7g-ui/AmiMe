@@ -20,16 +20,39 @@
 "use strict";
 
 const http = require("http");
+const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const Anthropic = require("@anthropic-ai/sdk");
 
 const PORT = process.env.PORT || 3000;
 const MODEL = "claude-opus-4-8";
-const { CHARMS } = require("./catalog.js");
+const { CHARMS, BRACELETS } = require("./catalog.js");
 
 const hasKey = !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
 const client = hasKey ? new Anthropic() : null;
+
+/* ---- optional Gemini-powered "on the wrist" mock-up ----------------------- *
+ * If GEMINI_API_KEY is set, /api/mockup composes the chosen bracelet + charms
+ * and asks Gemini's image model to render a lifestyle photo of a hand wearing
+ * them. The key stays server-side, exactly like ANTHROPIC_API_KEY.            */
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image-preview";
+const hasGemini = !!GEMINI_API_KEY;
+
+const CROPS_DIR = path.join(__dirname, "charms", "crops");
+const VALID_BRACELET_IDS = new Set(BRACELETS.map((b) => b.id));
+const CHARM_BY_ID = new Map(CHARMS.map((c) => [c.id, c]));
+const BRACELET_BY_ID = new Map(BRACELETS.map((b) => [b.id, b]));
+
+const MOCKUP_PROMPT =
+  "A warm, natural lifestyle product photo: a woman's hand and wrist wearing a " +
+  "delicate gold charm bracelet hung with these hand-painted enamel charms. The " +
+  "first reference image is the bracelet base; the remaining references are the " +
+  "charms to hang from it. Keep every charm faithful to its reference in shape, " +
+  "colour and painted detail. Soft natural daylight, shallow depth of field, a " +
+  "tasteful neutral background (cafe table or outdoors), premium and editorial. " +
+  "Square crop, photorealistic.";
 
 /* ---- the catalogue, compacted for the model ------------------------------ */
 const CATALOG_FOR_MODEL = CHARMS.map((c) => ({
@@ -108,6 +131,92 @@ async function recommendWithClaude(story, count) {
   return { summary: parsed.summary || "", charms, engine: "claude" };
 }
 
+/* ---- Gemini image mock-up ------------------------------------------------- */
+
+// Read a charm/bracelet cut-out from disk as base64. Returns null if missing.
+function loadCropBase64(id) {
+  const file = path.join(CROPS_DIR, id + ".webp");
+  // Guard against any path tricks sneaking in via the id.
+  if (!file.startsWith(CROPS_DIR)) return null;
+  try {
+    return fs.readFileSync(file).toString("base64");
+  } catch (e) {
+    return null;
+  }
+}
+
+// POST the prompt + reference images to Gemini and resolve the first image part.
+function callGemini(parts) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { responseModalities: ["IMAGE", "TEXT"] }
+    });
+    const options = {
+      method: "POST",
+      hostname: "generativelanguage.googleapis.com",
+      path: "/v1beta/models/" + encodeURIComponent(GEMINI_MODEL) +
+        ":generateContent?key=" + encodeURIComponent(GEMINI_API_KEY),
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body)
+      }
+    };
+    const req = https.request(options, (resp) => {
+      let data = "";
+      resp.on("data", (chunk) => { data += chunk; });
+      resp.on("end", () => {
+        let json;
+        try { json = JSON.parse(data); } catch (e) { return reject(new Error("gemini: bad json")); }
+        if (resp.statusCode < 200 || resp.statusCode >= 300) {
+          const msg = (json && json.error && json.error.message) || ("status " + resp.statusCode);
+          return reject(new Error("gemini: " + msg));
+        }
+        const cand = json.candidates && json.candidates[0];
+        const respParts = (cand && cand.content && cand.content.parts) || [];
+        for (const part of respParts) {
+          const inline = part.inlineData || part.inline_data;
+          if (inline && inline.data) {
+            return resolve({ data: inline.data, mime: inline.mimeType || inline.mime_type || "image/png" });
+          }
+        }
+        reject(new Error("gemini: no image in response"));
+      });
+    });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function generateMockup(braceletId, charmIds) {
+  const bracelet = BRACELET_BY_ID.get(braceletId);
+  const bImg = loadCropBase64(braceletId);
+  if (!bracelet || !bImg) throw new Error("unknown or missing bracelet image");
+
+  const parts = [
+    { text: MOCKUP_PROMPT },
+    { inline_data: { mime_type: "image/webp", data: bImg } }
+  ];
+  const usedCharms = [];
+  for (const id of charmIds) {
+    if (!CHARM_BY_ID.has(id)) continue;
+    const img = loadCropBase64(id);
+    if (!img) continue;
+    parts.push({ inline_data: { mime_type: "image/webp", data: img } });
+    usedCharms.push(id);
+  }
+
+  const result = await callGemini(parts);
+  return {
+    image: "data:" + result.mime + ";base64," + result.data,
+    bracelet: braceletId,
+    charms: usedCharms,
+    engine: "gemini",
+    model: GEMINI_MODEL
+  };
+}
+
 /* ---- tiny static file server + API --------------------------------------- */
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -140,7 +249,7 @@ function serveStatic(req, res) {
 
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/health") {
-    return sendJson(res, 200, { ok: true, claude: hasKey, model: MODEL });
+    return sendJson(res, 200, { ok: true, claude: hasKey, model: MODEL, gemini: hasGemini, geminiModel: GEMINI_MODEL });
   }
 
   if (req.method === "POST" && req.url === "/api/recommend") {
@@ -165,6 +274,32 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "POST" && req.url === "/api/mockup") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; if (body.length > 1e5) req.destroy(); });
+    req.on("end", async () => {
+      let payload;
+      try { payload = JSON.parse(body || "{}"); } catch (e) { return sendJson(res, 400, { error: "bad json" }); }
+      const braceletId = (payload.bracelet || "").toString();
+      const charmIds = Array.isArray(payload.charms)
+        ? payload.charms.map((c) => (c == null ? "" : c.toString())).filter(Boolean).slice(0, 12)
+        : [];
+      if (!braceletId || !VALID_BRACELET_IDS.has(braceletId)) {
+        return sendJson(res, 400, { error: "valid bracelet id required" });
+      }
+      if (!hasGemini) return sendJson(res, 503, { error: "gemini not configured" });
+
+      try {
+        const result = await generateMockup(braceletId, charmIds);
+        return sendJson(res, 200, result);
+      } catch (err) {
+        console.error("mockup error:", err && err.message ? err.message : err);
+        return sendJson(res, 502, { error: "mockup generation failed" });
+      }
+    });
+    return;
+  }
+
   if (req.method === "GET") return serveStatic(req, res);
   res.writeHead(405); res.end("method not allowed");
 });
@@ -174,4 +309,7 @@ server.listen(PORT, () => {
   console.log(hasKey
     ? "Claude matcher: ENABLED (model " + MODEL + ")"
     : "Claude matcher: DISABLED — set ANTHROPIC_API_KEY to enable. Front-end will use the on-device matcher.");
+  console.log(hasGemini
+    ? "Gemini mock-up: ENABLED (model " + GEMINI_MODEL + ")"
+    : "Gemini mock-up: DISABLED — set GEMINI_API_KEY to enable the 'see it on a wrist' preview.");
 });
