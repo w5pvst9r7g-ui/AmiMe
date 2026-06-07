@@ -54,14 +54,30 @@ const VALID_BRACELET_IDS = new Set(BRACELETS.map((b) => b.id));
 const CHARM_BY_ID = new Map(CHARMS.map((c) => [c.id, c]));
 const BRACELET_BY_ID = new Map(BRACELETS.map((b) => [b.id, b]));
 
-const MOCKUP_PROMPT =
-  "A warm, natural lifestyle product photo: a woman's hand and wrist wearing a " +
-  "delicate gold charm bracelet hung with these hand-painted enamel charms. The " +
-  "first reference image is the bracelet base; the remaining references are the " +
-  "charms to hang from it. Keep every charm faithful to its reference in shape, " +
-  "colour and painted detail. Soft natural daylight, shallow depth of field, a " +
-  "tasteful neutral background (cafe table or outdoors), premium and editorial. " +
-  "Square crop, photorealistic.";
+// Built per request so we can pin the EXACT number of charms (the model
+// otherwise invents extra ones) and demand even spacing (it otherwise clusters
+// them). `names` is the ordered list of the picked charms.
+function buildMockupPrompt(names) {
+  const n = names.length;
+  const list = names.map((nm, i) => "  " + (i + 2) + ". " + nm).join("\n");
+  return (
+    "A warm, natural lifestyle product photo of a woman's hand and wrist wearing " +
+    "ONE delicate gold charm bracelet.\n\n" +
+    "Reference images, in order:\n" +
+    "  1. the bracelet base (the chain/clasp to use)\n" +
+    list + "\n\n" +
+    "These " + n + " charms are the ONLY charms on the bracelet:\n" +
+    "- Show EXACTLY " + n + " charm" + (n === 1 ? "" : "s") + " — the ones provided as references — and NO others. " +
+    "Do not invent, add, duplicate, swap or omit any charm. Exactly " + n + " charm" + (n === 1 ? "" : "s") + ", no more, no fewer.\n" +
+    "- Keep each charm faithful to its reference in shape, colour and painted detail.\n" +
+    "- Hang the charms in a single row along the front of the bracelet, EVENLY SPACED " +
+    "with clear, equal gaps between them. Each charm must be fully visible and separated — " +
+    "they must NOT bunch up, overlap, touch or cluster together.\n" +
+    "- Exactly one bracelet, worn on the wrist; no extra jewellery.\n\n" +
+    "Style: soft natural daylight, shallow depth of field, tasteful neutral background " +
+    "(cafe table or outdoors), premium editorial product photography. Square crop, photorealistic."
+  );
+}
 
 /* ---- the catalogue, compacted for the model ------------------------------ */
 const CATALOG_FOR_MODEL = CHARMS.map((c) => ({
@@ -240,17 +256,25 @@ async function generateMockup(braceletId, charmIds) {
   const bImg = loadCropBase64(braceletId);
   if (!bracelet || !bImg) throw new Error("unknown or missing bracelet image");
 
-  const parts = [
-    { text: MOCKUP_PROMPT },
-    { inline_data: { mime_type: "image/webp", data: bImg } }
-  ];
+  // Collect only the valid, image-backed picked charms first, so the prompt can
+  // state their exact count and names (and so we send no stray references).
   const usedCharms = [];
+  const charmImages = [];
   for (const id of charmIds) {
-    if (!CHARM_BY_ID.has(id)) continue;
+    const charm = CHARM_BY_ID.get(id);
+    if (!charm) continue;
     const img = loadCropBase64(id);
     if (!img) continue;
-    parts.push({ inline_data: { mime_type: "image/webp", data: img } });
     usedCharms.push(id);
+    charmImages.push({ name: charm.name, data: img });
+  }
+
+  const parts = [
+    { text: buildMockupPrompt(charmImages.map((c) => c.name)) },
+    { inline_data: { mime_type: "image/webp", data: bImg } }
+  ];
+  for (const c of charmImages) {
+    parts.push({ inline_data: { mime_type: "image/webp", data: c.data } });
   }
 
   // Try the configured model; if the name is rejected (404 / unsupported),
