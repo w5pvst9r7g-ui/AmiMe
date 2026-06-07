@@ -956,13 +956,21 @@
     });
   });
 
-  // Probe the optional Claude backend.
-  fetch("/api/health", { method: "GET" }).then(function (r) {
-    return r.ok ? r.json() : null;
-  }).then(function (j) {
-    backendAvailable = !!(j && j.ok && j.claude);
-    setEngineNote();
-  }).catch(function () { backendAvailable = false; setEngineNote(); });
+  // Probe the optional Claude backend — but only over http(s). Opened as a
+  // local file (file://), fetch can throw on iOS Safari, so we skip it and go
+  // straight to the on-device matcher. Always guarded so nothing below breaks.
+  function probeBackend() {
+    var http = location.protocol === "http:" || location.protocol === "https:";
+    if (!http || typeof fetch !== "function") { backendAvailable = false; setEngineNote(); return; }
+    try {
+      fetch("/api/health", { method: "GET" }).then(function (r) {
+        return r.ok ? r.json() : null;
+      }).then(function (j) {
+        backendAvailable = !!(j && j.ok && j.claude);
+        setEngineNote();
+      }).catch(function () { backendAvailable = false; setEngineNote(); });
+    } catch (e) { backendAvailable = false; setEngineNote(); }
+  }
 
   function setEngineNote(active) {
     if (active === "ai") {
@@ -1099,6 +1107,8 @@
   function cap(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
 
   buildCatalogue();
+  setEngineNote();   // sensible default immediately (on-device)
+  probeBackend();    // upgrade to AI note if a backend is reachable
 })();
 </script>
 </body>
