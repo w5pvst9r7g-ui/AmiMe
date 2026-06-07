@@ -32,7 +32,8 @@ WEIGHTS = {
                os.path.join(ROOT, "tools", "weights", "RealESRGAN_x4plus.pth")),
 }
 MODEL = os.environ.get("ESRGAN_MODEL", "x4v3")
-OUT_CANVAS = 1024
+OUT_CANVAS = int(os.environ.get("ESRGAN_CANVAS", "1024"))
+OUT_DIR = os.environ.get("ESRGAN_OUT", os.path.join(ROOT, "charms", "crops"))
 TILE = 256          # tile size to bound CPU memory
 
 
@@ -69,27 +70,30 @@ def build_model(state):
             out = self.up(out)
             return out + F.interpolate(x, scale_factor=self.upscale, mode="nearest")
 
-    # RRDBNet (x4plus)
-    class RDB(nn.Module):
+    # RRDBNet (x4plus) — names match the official basicsr checkpoint
+    import torch
+
+    class ResidualDenseBlock(nn.Module):
         def __init__(self, nf=64, gc=32):
             super().__init__()
-            self.c1 = nn.Conv2d(nf, gc, 3, 1, 1); self.c2 = nn.Conv2d(nf + gc, gc, 3, 1, 1)
-            self.c3 = nn.Conv2d(nf + 2 * gc, gc, 3, 1, 1); self.c4 = nn.Conv2d(nf + 3 * gc, gc, 3, 1, 1)
-            self.c5 = nn.Conv2d(nf + 4 * gc, nf, 3, 1, 1); self.l = nn.LeakyReLU(0.2, True)
+            self.conv1 = nn.Conv2d(nf, gc, 3, 1, 1); self.conv2 = nn.Conv2d(nf + gc, gc, 3, 1, 1)
+            self.conv3 = nn.Conv2d(nf + 2 * gc, gc, 3, 1, 1); self.conv4 = nn.Conv2d(nf + 3 * gc, gc, 3, 1, 1)
+            self.conv5 = nn.Conv2d(nf + 4 * gc, nf, 3, 1, 1); self.lrelu = nn.LeakyReLU(0.2, True)
 
         def forward(self, x):
-            x1 = self.l(self.c1(x)); x2 = self.l(self.c2(__import__("torch").cat((x, x1), 1)))
-            import torch
-            x3 = self.l(self.c3(torch.cat((x, x1, x2), 1)))
-            x4 = self.l(self.c4(torch.cat((x, x1, x2, x3), 1)))
-            x5 = self.c5(torch.cat((x, x1, x2, x3, x4), 1))
+            x1 = self.lrelu(self.conv1(x)); x2 = self.lrelu(self.conv2(torch.cat((x, x1), 1)))
+            x3 = self.lrelu(self.conv3(torch.cat((x, x1, x2), 1)))
+            x4 = self.lrelu(self.conv4(torch.cat((x, x1, x2, x3), 1)))
+            x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
             return x5 * 0.2 + x
 
     class RRDB(nn.Module):
         def __init__(self, nf, gc=32):
-            super().__init__(); self.r1 = RDB(nf, gc); self.r2 = RDB(nf, gc); self.r3 = RDB(nf, gc)
+            super().__init__()
+            self.rdb1 = ResidualDenseBlock(nf, gc); self.rdb2 = ResidualDenseBlock(nf, gc)
+            self.rdb3 = ResidualDenseBlock(nf, gc)
         def forward(self, x):
-            return self.r3(self.r2(self.r1(x))) * 0.2 + x
+            return self.rdb3(self.rdb2(self.rdb1(x))) * 0.2 + x
 
     class RRDBNet(nn.Module):
         def __init__(self, nf=64, nb=23, gc=32, scale=4):
@@ -159,7 +163,7 @@ def main(ids):
     sheets = {1:"sheet-1-blue-white",2:"sheet-2-dolce-vita",3:"sheet-3-mama",4:"sheet-4-folk-oval",
               5:"sheet-5-terracotta",6:"sheet-6-vintage-miniatures",7:"sheet-7-retro-childhood",
               8:"sheet-8-teacup-critters",9:"sheet-9-sweetheart"}
-    out_dir = os.path.join(ROOT, "charms", "crops");
+    out_dir = OUT_DIR; os.makedirs(out_dir, exist_ok=True)
     if not ids:
         ids = list(centers.keys())
 
@@ -191,8 +195,31 @@ def main(ids):
             done += 1
             if done % 10 == 0:
                 print("  ...", done, "done")
-        print("sheet", s, "complete")
-    print("upscaled", done, "charms to", OUT_CANVAS, "px (model:", MODEL + ")")
+        print("sheet", s, "complete", flush=True)
+
+    # bracelets (only on a full run, i.e. no explicit id list)
+    if not sys.argv[1:]:
+        bc = os.path.join(ROOT, "tools", "bracelet_centers.json")
+        if os.path.exists(bc):
+            bcent = json.load(open(bc))
+            orig, alpha = ac.cut(os.path.join(ROOT, "charms", "bracelets-aceworks.jpeg"))
+            lbl, comps = ac.components(alpha)
+            for bid, c in bcent.items():
+                li = ac.label_at(lbl, comps, c["cx"], c["cy"])
+                if li is None:
+                    continue
+                ys, xs = np.where(lbl == li)
+                x0, x1, y0, y1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
+                rgb = orig[y0:y1, x0:x1].copy()
+                a = np.where(lbl[y0:y1, x0:x1] == li, alpha[y0:y1, x0:x1], 0).astype(np.uint8)
+                big = upscale_rgb(model, torch, rgb)
+                a_big = np.asarray(Image.fromarray(a).resize((big.shape[1], big.shape[0]), Image.BICUBIC))
+                rgba = Image.fromarray(np.dstack([big, a_big]).astype(np.uint8), "RGBA")
+                canvas = ac.normalize_crop(rgba, OUT_CANVAS, target_w=0.9, center_y=0.5)
+                canvas.save(os.path.join(out_dir, bid + ".webp"), "WEBP", quality=92, method=6)
+                done += 1
+            print("bracelets complete", flush=True)
+    print("upscaled", done, "items to", OUT_CANVAS, "px (model:", MODEL + ")", flush=True)
 
 
 if __name__ == "__main__":
