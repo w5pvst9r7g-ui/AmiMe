@@ -47,23 +47,32 @@ def load_png(path):
     return buf.getvalue()
 
 
+# Override with e.g. GEMINI_IMAGE_MODEL=gemini-2.0-flash-preview-image-generation
+GEMINI_MODEL = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image-preview")
+
+
 def gemini_image(prompt, images, out_path):
-    from google import genai
-    from google.genai import types
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    parts = [types.Part.from_text(prompt)]
+    """Call the Gemini REST API directly (stdlib only — no SDK needed)."""
+    import urllib.request
+    url = ("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
+           % (GEMINI_MODEL, os.environ["GEMINI_API_KEY"]))
+    parts = [{"text": prompt}]
     for img in images:
-        parts.append(types.Part.from_bytes(data=img, mime_type="image/png"))
-    resp = client.models.generate_content(
-        model="gemini-2.0-flash-preview-image-generation",
-        contents=parts,
-        config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
-    )
-    for part in resp.candidates[0].content.parts:
-        if getattr(part, "inline_data", None):
-            open(out_path, "wb").write(part.inline_data.data)
+        parts.append({"inline_data": {"mime_type": "image/png",
+                                      "data": base64.b64encode(img).decode("ascii")}})
+    body = json.dumps({
+        "contents": [{"parts": parts}],
+        "generationConfig": {"responseModalities": ["IMAGE", "TEXT"]},
+    }).encode()
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        data = json.load(r)
+    for part in data["candidates"][0]["content"]["parts"]:
+        inline = part.get("inlineData") or part.get("inline_data")
+        if inline and inline.get("data"):
+            open(out_path, "wb").write(base64.b64decode(inline["data"]))
             return out_path
-    raise RuntimeError("no image returned")
+    raise RuntimeError("no image in response: " + json.dumps(data)[:300])
 
 
 def openai_image(prompt, images, out_path):
