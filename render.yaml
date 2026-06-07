@@ -29,4 +29,4 @@ services:
         sync: false
       # Pin the Gemini image model (override here if you switch models).
       - key: GEMINI_IMAGE_MODEL
-        value: gemini-2.5-flash-image-preview
+        value: gemini-2.5-flash-image

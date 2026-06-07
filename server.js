@@ -37,7 +37,7 @@ const client = hasKey ? new Anthropic() : null;
  * and asks Gemini's image model to render a lifestyle photo of a hand wearing
  * them. The key stays server-side, exactly like ANTHROPIC_API_KEY.            */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image-preview";
+const GEMINI_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
 const hasGemini = !!GEMINI_API_KEY;
 
 const CROPS_DIR = path.join(__dirname, "charms", "crops");
@@ -145,6 +145,34 @@ function loadCropBase64(id) {
   }
 }
 
+// Build an Error carrying the upstream status + a plain-English message so the
+// route handler can surface a useful reason to the browser (not a generic 502).
+function geminiError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+// Translate a raw Gemini/error message into a one-line, non-technical next step.
+function mockupHint(msg, status) {
+  const m = (msg || "").toLowerCase();
+  if (status === 401 || status === 403 || m.indexOf("api key") !== -1 ||
+      m.indexOf("api_key") !== -1 || m.indexOf("permission") !== -1 || m.indexOf("unauthor") !== -1) {
+    return "Check GEMINI_API_KEY in your Render dashboard (Environment tab) — it may be missing, mistyped, or not enabled for image generation.";
+  }
+  if (status === 404 || m.indexOf("not found") !== -1 || m.indexOf("is not supported") !== -1 ||
+      m.indexOf("not supported for generatecontent") !== -1) {
+    return "The image model name may be wrong or retired. Set GEMINI_IMAGE_MODEL to 'gemini-2.5-flash-image' in Render (Environment tab) and redeploy.";
+  }
+  if (status === 429 || m.indexOf("quota") !== -1 || m.indexOf("exhausted") !== -1 || m.indexOf("rate") !== -1) {
+    return "You've hit Gemini's rate limit or free-tier quota. Wait a minute and try again, or check your quota/billing in Google AI Studio.";
+  }
+  if (m.indexOf("billing") !== -1) {
+    return "Image generation may require billing enabled on your Google AI / Cloud project.";
+  }
+  return "";
+}
+
 // POST the prompt + reference images to Gemini and resolve the first image part.
 function callGemini(parts) {
   return new Promise((resolve, reject) => {
@@ -167,10 +195,15 @@ function callGemini(parts) {
       resp.on("data", (chunk) => { data += chunk; });
       resp.on("end", () => {
         let json;
-        try { json = JSON.parse(data); } catch (e) { return reject(new Error("gemini: bad json")); }
+        try {
+          json = JSON.parse(data);
+        } catch (e) {
+          return reject(geminiError(resp.statusCode,
+            "Gemini returned an unexpected (non-JSON) response."));
+        }
         if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          const msg = (json && json.error && json.error.message) || ("status " + resp.statusCode);
-          return reject(new Error("gemini: " + msg));
+          const msg = (json && json.error && json.error.message) || ("HTTP " + resp.statusCode);
+          return reject(geminiError(resp.statusCode, msg));
         }
         const cand = json.candidates && json.candidates[0];
         const respParts = (cand && cand.content && cand.content.parts) || [];
@@ -180,7 +213,11 @@ function callGemini(parts) {
             return resolve({ data: inline.data, mime: inline.mimeType || inline.mime_type || "image/png" });
           }
         }
-        reject(new Error("gemini: no image in response"));
+        // A 200 with no image usually means the model declined the prompt.
+        const blocked = cand && (cand.finishReason || (cand.safetyRatings ? "safety" : ""));
+        reject(geminiError(502, blocked
+          ? "Gemini returned no image (finishReason: " + blocked + ")."
+          : "Gemini returned no image."));
       });
     });
     req.on("error", reject);
@@ -293,8 +330,15 @@ const server = http.createServer((req, res) => {
         const result = await generateMockup(braceletId, charmIds);
         return sendJson(res, 200, result);
       } catch (err) {
-        console.error("mockup error:", err && err.message ? err.message : err);
-        return sendJson(res, 502, { error: "mockup generation failed" });
+        const detail = err && err.message ? err.message : String(err);
+        const status = err && err.status ? err.status : 502;
+        console.error("mockup error (model " + GEMINI_MODEL + "):", detail);
+        return sendJson(res, 502, {
+          error: "mockup generation failed",
+          detail: detail,
+          hint: mockupHint(detail, status),
+          model: GEMINI_MODEL
+        });
       }
     });
     return;
