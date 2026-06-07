@@ -5,7 +5,12 @@ Inlines catalog.js + matcher.js, embeds every charm crop and product sheet as a
 base64 data URI, and strips the backend probe (standalone = on-device matcher).
 Output: amime-charm-matcher.html  (open it anywhere — no server, no internet).
 """
-import base64, mimetypes, os, re
+import base64, io, mimetypes, os, re
+from PIL import Image
+
+# The hosted site serves full-resolution crops; the single-file build embeds
+# down-scaled copies so it stays a reasonable size for offline / iOS testing.
+STANDALONE_CROP_MAX = 512
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "amime-charm-matcher.html")
@@ -32,12 +37,22 @@ matcher_js = read("matcher.js")
 html = html.replace('<script src="catalog.js"></script>', "<script>\n" + catalog_js + "\n</script>")
 html = html.replace('<script src="matcher.js"></script>', "<script>\n" + matcher_js + "\n</script>")
 
-# 2) build the embedded crop map (id -> data URI)
+# 2) build the embedded crop map (id -> data URI), down-scaled to keep the
+#    single file lightweight (full-res crops are served by the hosted site).
+def crop_data_uri(path):
+    im = Image.open(path).convert("RGBA")
+    if max(im.size) > STANDALONE_CROP_MAX:
+        im.thumbnail((STANDALONE_CROP_MAX, STANDALONE_CROP_MAX), Image.LANCZOS)
+    buf = io.BytesIO()
+    im.save(buf, "WEBP", quality=86, method=3)
+    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+    return "data:image/webp;base64," + b64
+
 crops = {}
 crop_dir = os.path.join(ROOT, "charms", "crops")
 for fn in sorted(os.listdir(crop_dir)):
     if fn.endswith(".webp"):
-        crops[fn[:-5]] = data_uri(os.path.join("charms", "crops", fn))
+        crops[fn[:-5]] = crop_data_uri(os.path.join(crop_dir, fn))
 
 
 def to_js_obj(d):
