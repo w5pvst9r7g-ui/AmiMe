@@ -194,6 +194,15 @@
     margin: 12px 0 0; text-align:center;
   }
   .mockup-card .mk-note.error { color: #b04a3a; }
+  .mockup-card .mk-detail {
+    max-width: 520px; margin: 10px auto 0; font-family: ui-sans-serif, system-ui, sans-serif;
+    font-size: 12px; color: var(--ink-soft);
+  }
+  .mockup-card .mk-detail summary { cursor: pointer; }
+  .mockup-card .mk-detail code {
+    display:block; margin-top: 8px; padding: 10px 12px; background: #f3ede0;
+    border-radius: 10px; color: var(--ink); word-break: break-word; white-space: pre-wrap;
+  }
   .mk-spinner {
     width: 100%; max-width:520px; height: 280px; margin: 0 auto; border-radius:14px;
     background: linear-gradient(110deg, #f3ead4 8%, #fbf6ea 18%, #f3ead4 33%);
@@ -614,10 +623,13 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bracelet: br.id, charms: charmIds })
     }).then(function (r) {
-      if (!r.ok) throw new Error("mockup error");
-      return r.json();
+      // Always read the body so we can show the server's reason on failure.
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) { j.__status = r.status; throw j; }
+        return j;
+      });
     }).then(function (data) {
-      if (!data || !data.image) throw new Error("no image");
+      if (!data || !data.image) { throw { error: "no image returned" }; }
       mockupEl.innerHTML =
         '<div class="mockup-card">' +
           '<div class="mk-kicker">Your bracelet, on a wrist</div>' +
@@ -625,13 +637,35 @@
           '<p class="mk-note">An AI impression of the ' + esc(br.name) +
             ' with your charms — a styling preview, not the final piece.</p>' +
         '</div>';
-    }).catch(function () {
-      mockupEl.innerHTML =
-        '<div class="mockup-card">' +
-          '<div class="mk-kicker">Your bracelet, on a wrist</div>' +
-          '<p class="mk-note error">Sorry — the mock-up couldn\'t be generated just now. Please try again.</p>' +
-        '</div>';
+    }).catch(function (err) {
+      showMockupError(br, err);
     });
+  }
+
+  // Render a helpful failure card: a plain message, the server's next-step hint,
+  // the raw technical detail (for support), and a one-tap retry.
+  function showMockupError(br, err) {
+    var hint = err && err.hint ? err.hint : "";
+    var detail = err && (err.detail || err.error) ? (err.detail || err.error) : "";
+    var network = !err || (!err.detail && !err.hint && !err.__status);
+    var lead = network
+      ? "Couldn't reach the mock-up service. Check your connection and try again."
+      : "Sorry — we couldn't create the mock-up.";
+    var html =
+      '<div class="mockup-card">' +
+        '<div class="mk-kicker">Your bracelet, on a wrist</div>' +
+        '<p class="mk-note error">' + esc(lead) + '</p>' +
+        (hint ? '<p class="mk-note">→ ' + esc(hint) + '</p>' : '') +
+        (detail ? '<details class="mk-detail"><summary>Technical detail</summary><code>' +
+          esc(detail) + (err && err.model ? ' (model: ' + esc(err.model) + ')' : '') +
+          '</code></details>' : '') +
+        '<div style="text-align:center;margin-top:14px">' +
+          '<button class="br-mockup" type="button" id="mkRetry">Try again ↻</button>' +
+        '</div>' +
+      '</div>';
+    mockupEl.innerHTML = html;
+    var rb = document.getElementById("mkRetry");
+    if (rb) rb.addEventListener("click", function () { generateMockup(br); });
   }
 
   // ---- alternatives menu ----
